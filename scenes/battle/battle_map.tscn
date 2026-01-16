@@ -1,0 +1,85 @@
+[gd_scene load_steps=2 format=3 uid="uid://pksihtgf4die"]
+
+[ext_resource type="Script" uid="uid://dyl2md66kxxas" path="res://scenes/battle/battle_map_manager.gd" id="1_6cni1"]
+
+[node name="BattleMap" type="Node2D"]
+script = ExtResource("1_6cni1")
+
+[node name="GridContainer" type="Node2D" parent="."]
+
+[node name="UnitsContainer" type="Node2D" parent="."]
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(960, 540)
+
+[node name="UILayer" type="CanvasLayer" parent="."]
+
+[node name="BattleUI" type="Control" parent="UILayer"]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="TopBar" type="PanelContainer" parent="UILayer/BattleUI"]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="HBoxContainer" type="HBoxContainer" parent="UILayer/BattleUI/TopBar"]
+layout_mode = 2
+
+[node name="TurnLabel" type="Label" parent="UILayer/BattleUI/TopBar/HBoxContainer"]
+layout_mode = 2
+
+[node name="PhaseLabel" type="Label" parent="UILayer/BattleUI/TopBar/HBoxContainer"]
+layout_mode = 2
+
+[node name="BottomBar" type="PanelContainer" parent="UILayer/BattleUI/TopBar"]
+layout_mode = 2
+
+[node name="UnitInfoPanel" type="PanelContainer" parent="UILayer/BattleUI/TopBar/BottomBar"]
+layout_mode = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="UILayer/BattleUI/TopBar/BottomBar/UnitInfoPanel"]
+layout_mode = 2
+
+[node name="UnitNameLabel" type="Label" parent="UILayer/BattleUI/TopBar/BottomBar/UnitInfoPanel/VBoxContainer"]
+layout_mode = 2
+
+[node name="HPLabel" type="Label" parent="UILayer/BattleUI/TopBar/BottomBar/UnitInfoPanel/VBoxContainer"]
+layout_mode = 2
+
+[node name="StatsLabel" type="Label" parent="UILayer/BattleUI/TopBar/BottomBar/UnitInfoPanel/VBoxContainer"]
+layout_mode = 2
+
+[node name="ButtonsContainer" type="HBoxContainer" parent="UILayer/BattleUI/TopBar/BottomBar"]
+layout_mode = 2
+
+[node name="EndTurnButton" type="Button" parent="UILayer/BattleUI/TopBar/BottomBar/ButtonsContainer"]
+layout_mode = 2
+
+[node name="WaitButton" type="Button" parent="UILayer/BattleUI/TopBar/BottomBar/ButtonsContainer"]
+layout_mode = 2
+
+[node name="MenuButton" type="Button" parent="UILayer/BattleUI/TopBar/BottomBar/ButtonsContainer"]
+layout_mode = 2
+
+[node name="PopupPanel" type="PopupPanel" parent="UILayer/BattleUI"]
+
+[node name="VBoxContainer" type="VBoxContainer" parent="UILayer/BattleUI/PopupPanel"]
+offset_left = 4.0
+offset_top = 4.0
+offset_right = 96.0
+offset_bottom = 96.0
+
+[node name="AttackButton" type="Button" parent="UILayer/BattleUI/PopupPanel/VBoxContainer"]
+layout_mode = 2
+
+[node name="AbilitiesButton" type="Button" parent="UILayer/BattleUI/PopupPanel/VBoxContainer"]
+layout_mode = 2
+
+[node name="ItemsButton" type="Button" parent="UILayer/BattleUI/PopupPanel/VBoxContainer"]
+layout_mode = 2
+
+[node name="CancelButton" type="Button" parent="UILayer/BattleUI/PopupPanel/VBoxContainer"]
+layout_mode = 2
