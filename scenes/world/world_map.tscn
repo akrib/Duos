@@ -1,6 +1,7 @@
-[gd_scene load_steps=6 format=3 uid="uid://cnb8xh4y5qw7m"]
+[gd_scene load_steps=7 format=3 uid="uid://cnb8xh4y5qw7m"]
 
 [ext_resource type="Script" uid="uid://dpfs2p4ib7fjk" path="res://scenes/world/world_map.gd" id="1_world_map"]
+[ext_resource type="Texture2D" uid="uid://c8chvygqvhoci" path="res://icon.svg" id="2_lhxl1"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_dp5rp"]
 
@@ -250,7 +251,10 @@ position = Vector2(1500, 700)
 shape = SubResource("RectangleShape2D_jabx1")
 
 [node name="BattleArea" type="Area2D" parent="InteractionAreas"]
-position = Vector2(611, 783)
+position = Vector2(569, 674)
+
+[node name="Sprite2D" type="Sprite2D" parent="InteractionAreas/BattleArea"]
+texture = ExtResource("2_lhxl1")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="InteractionAreas/BattleArea"]
 shape = SubResource("CircleShape2D_dp5rp")

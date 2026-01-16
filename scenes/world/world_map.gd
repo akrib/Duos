@@ -45,8 +45,6 @@ func _ready() -> void:
 	_connect_to_event_bus()
 	
 		# AJOUT : Rendre les zones visibles en mode debug
-	if OS.is_debug_build():
-		_make_areas_visible()
 	
 	# Afficher le mode debug si activé
 	debug_info.visible = OS.is_debug_build()
@@ -56,6 +54,7 @@ func _ready() -> void:
 	
 	print("[WorldMap] Carte du monde initialisée")
 
+
 ## Auto-connexion des signaux via SceneLoader
 func _get_signal_connections() -> Array:
 	"""
@@ -63,13 +62,13 @@ func _get_signal_connections() -> Array:
 	"""
 	if not is_node_ready():
 		return []
-	
+	 #_on_party_pressed
 	return [
 		{
 			"source": party_button,
 			"signal_name": "pressed",
 			"target": self,
-			"method": "_on_party_pressed"
+			"method": "_on_battle_clicked"
 		},
 		{
 			"source": inventory_button,
@@ -215,8 +214,15 @@ func _on_town2_clicked(_viewport: Node, event: InputEvent, _shape_idx: int) -> v
 
 # func _on_forest_battle_clicked() -> void:
 func _on_battle_clicked(_viewport: Node, event: InputEvent, _shape_idx: int) -> void:
+#func _on_battle_clicked() -> void:
 	"""Quand le joueur clique sur une zone de combat dans la forêt"""
+	if event is InputEventMouseButton:
+		print("  Mouse button: ", event.button_index, ", Pressed: ", event.pressed)
 	
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		print("  ✅✅✅ CLIC GAUCHE CONFIRMÉ SUR ZONE DE COMBAT ✅✅✅")
+		
+		show_notification("Préparation du combat...", 2.0)
 	# Préparer les données du combat
 	var battle_data = _create_forest_battle_data()
 	
@@ -559,22 +565,4 @@ func _exit_tree() -> void:
 	"""Nettoyage à la fermeture de la scène"""
 	EventBus.disconnect_all(self)
 	print("[WorldMap] Scène nettoyée")
-
-
-func _make_areas_visible() -> void:
-	"""Rend les zones cliquables visibles en mode debug"""
-	for area in [town1_area, castle_area, town2_area, battle_area]:
-		# Créer un ColorRect pour visualiser la zone
-		var visual = ColorRect.new()
-		visual.size = Vector2(100, 100)
-		visual.position = -visual.size / 2
-		visual.color = Color(1, 0, 0, 0.3)  # Rouge transparent
-		visual.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Ne pas bloquer les clics
-		area.add_child(visual)
-		
-		# Ajouter un label avec le nom
-		var label = Label.new()
-		label.text = area.name
-		label.position = Vector2(-50, 60)
-		label.add_theme_color_override("font_color", Color.YELLOW)
-		area.add_child(label)
+	
