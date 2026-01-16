@@ -12,7 +12,7 @@ config_version=5
 
 config/name="Tactical RPG Duos"
 config/description="Tactical RPG avec système de duos et choix systémiques"
-run/main_scene="res://scenes/menus/main_menu.tscn"
+run/main_scene="uid://ceiip1bmiqtbi"
 config/features=PackedStringArray("4.5", "Forward Plus")
 config/icon="res://icon.svg"
 
