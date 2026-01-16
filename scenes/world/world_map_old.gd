@@ -16,11 +16,11 @@ class_name WorldMap
 @onready var kharvul_label: Label = $UI/TopBar/MarginContainer/HBoxContainer/DivinityPanel/KharvulLabel
 @onready var debug_info: Label = $UI/DebugInfo
 
-# Boutons d'interaction
-@onready var town1_button: Button = $InteractionButtons/Town1Button
-@onready var castle_button: Button = $InteractionButtons/CastleButton
-@onready var town2_button: Button = $InteractionButtons/Town2Button
-@onready var battle_button: Button = $InteractionButtons/BattleButton
+# Zones interactives
+@onready var town1_area: Area2D = $InteractionAreas/Town1Area
+@onready var castle_area: Area2D = $InteractionAreas/CastleArea
+@onready var town2_area: Area2D = $InteractionAreas/Town2Area
+@onready var battle_area: Area2D = $InteractionAreas/BattleArea
 
 # État
 var camera_velocity: Vector2 = Vector2.ZERO
@@ -44,6 +44,8 @@ func _ready() -> void:
 	# Connexions aux événements
 	_connect_to_event_bus()
 	
+		# AJOUT : Rendre les zones visibles en mode debug
+	
 	# Afficher le mode debug si activé
 	debug_info.visible = OS.is_debug_build()
 	
@@ -60,13 +62,13 @@ func _get_signal_connections() -> Array:
 	"""
 	if not is_node_ready():
 		return []
-	
+	 #_on_party_pressed
 	return [
 		{
 			"source": party_button,
 			"signal_name": "pressed",
 			"target": self,
-			"method": "_on_party_pressed"
+			"method": "_on_battle_clicked"
 		},
 		{
 			"source": inventory_button,
@@ -81,26 +83,26 @@ func _get_signal_connections() -> Array:
 			"method": "_on_menu_pressed"
 		},
 		{
-			"source": town1_button,
-			"signal_name": "pressed",
+			"source": town1_area,
+			"signal_name": "input_event",
 			"target": self,
 			"method": "_on_town1_clicked"
 		},
 		{
-			"source": castle_button,
-			"signal_name": "pressed",
+			"source": castle_area,
+			"signal_name": "input_event",
 			"target": self,
 			"method": "_on_castle_clicked"
 		},
 		{
-			"source": town2_button,
-			"signal_name": "pressed",
+			"source": town2_area,
+			"signal_name": "input_event",
 			"target": self,
 			"method": "_on_town2_clicked"
 		},
 		{
-			"source": battle_button,
-			"signal_name": "pressed",
+			"source": battle_area,
+			"signal_name": "input_event",
 			"target": self,
 			"method": "_on_battle_clicked"
 		},
@@ -186,31 +188,41 @@ func move_camera_to(target_position: Vector2, duration: float = 1.0) -> void:
 	tween.tween_property(camera, "position", target_position, duration).set_ease(Tween.EASE_IN_OUT)
 
 # ============================================================================
-# INTERACTIONS AVEC LES ZONES (BOUTONS)
+# INTERACTIONS AVEC LES ZONES
 # ============================================================================
 
-func _on_town1_clicked() -> void:
+func _on_town1_clicked(_viewport: Node, event: InputEvent, _shape_idx: int) -> void:
 	"""Clic sur le Village du Nord"""
-	select_location("Village du Nord", Vector2(400, 300))
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		select_location("Village du Nord", town1_area.position)
 
-func _on_castle_clicked() -> void:
+func _on_castle_clicked(_viewport: Node, event: InputEvent, _shape_idx: int) -> void:
 	"""Clic sur le Château Royal"""
-	select_location("Château Royal", Vector2(960, 540))
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		select_location("Château Royal", castle_area.position)
 
-func _on_town2_clicked() -> void:
+func _on_town2_clicked(_viewport: Node, event: InputEvent, _shape_idx: int) -> void:
 	"""Clic sur le Port de l'Est"""
-	select_location("Port de l'Est", Vector2(1500, 700))
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		select_location("Port de l'Est", town2_area.position)
 
-func _on_battle_clicked() -> void:
-	"""Clic sur la Zone de Combat"""
-	print("[WorldMap] ✅ Clic sur Zone de Combat détecté !")
-	_start_forest_battle()
+# func _on_battle_clicked(_viewport: Node, event: InputEvent, _shape_idx: int) -> void:
+#	"""Clic sur la Zone de Combat"""
+#	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+#		select_location("Zone de Combat", battle_area.position)
 
-func _start_forest_battle() -> void:
-	"""Lance le combat de la forêt"""
-	print("[WorldMap] Lancement du combat de la forêt...")
-	show_notification("Préparation du combat...", 2.0)
+
+# func _on_forest_battle_clicked() -> void:
+func _on_battle_clicked(_viewport: Node, event: InputEvent, _shape_idx: int) -> void:
+#func _on_battle_clicked() -> void:
+	"""Quand le joueur clique sur une zone de combat dans la forêt"""
+	if event is InputEventMouseButton:
+		print("  Mouse button: ", event.button_index, ", Pressed: ", event.pressed)
 	
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		print("  ✅✅✅ CLIC GAUCHE CONFIRMÉ SUR ZONE DE COMBAT ✅✅✅")
+		
+		show_notification("Préparation du combat...", 2.0)
 	# Préparer les données du combat
 	var battle_data = _create_forest_battle_data()
 	
@@ -405,6 +417,8 @@ func _create_forest_battle_data() -> Dictionary:
 		"music": "res://audio/music/battle_forest.ogg"
 	}
 
+
+
 func select_location(location_name: String, position: Vector2) -> void:
 	"""Sélectionne une location et propose d'y voyager"""
 	selected_location = location_name
@@ -437,7 +451,14 @@ func travel_to_selected_location() -> void:
 			# EventBus.change_scene(SceneRegistry.SceneID.TOWN)
 		
 		"Zone de Combat":
-			_start_forest_battle()
+			# Préparer les données de combat
+			var battle_data = {
+				"location": "Northern Plains",
+				"enemy_count": 6,
+				"difficulty": "normal"
+			}
+			EventBus.start_battle(battle_data)
+			EventBus.change_scene(SceneRegistry.SceneID.BATTLE)
 	
 	selected_location = ""
 
@@ -544,3 +565,4 @@ func _exit_tree() -> void:
 	"""Nettoyage à la fermeture de la scène"""
 	EventBus.disconnect_all(self)
 	print("[WorldMap] Scène nettoyée")
+	

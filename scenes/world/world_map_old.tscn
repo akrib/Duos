@@ -1,7 +1,16 @@
-[gd_scene load_steps=3 format=3 uid="uid://cnb8xh4y5qw7m"]
+[gd_scene load_steps=7 format=3 uid="uid://bqhv6tv217yd8"]
 
 [ext_resource type="Script" uid="uid://dpfs2p4ib7fjk" path="res://scenes/world/world_map.gd" id="1_world_map"]
 [ext_resource type="Texture2D" uid="uid://c8chvygqvhoci" path="res://icon.svg" id="2_lhxl1"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_dp5rp"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_lhxl1"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_jabx1"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_dp5rp"]
+radius = 45.044422
 
 [node name="WorldMap" type="Node2D"]
 script = ExtResource("1_world_map")
@@ -221,57 +230,32 @@ text = "[DEBUG]
 Camera Pos: (0, 0)
 Zoom: 1.0"
 
-[node name="InteractionButtons" type="CanvasLayer" parent="."]
+[node name="InteractionAreas" type="Node2D" parent="."]
 
-[node name="Town1Button" type="Button" parent="InteractionButtons"]
-offset_left = 350.0
-offset_top = 250.0
-offset_right = 450.0
-offset_bottom = 350.0
-theme_override_colors/font_color = Color(1, 1, 0.8, 1)
-theme_override_font_sizes/font_size = 18
-text = "🏘️
-Village
-du Nord"
-flat = true
+[node name="Town1Area" type="Area2D" parent="InteractionAreas"]
+position = Vector2(400, 300)
 
-[node name="CastleButton" type="Button" parent="InteractionButtons"]
-offset_left = 885.0
-offset_top = 465.0
-offset_right = 1035.0
-offset_bottom = 615.0
-theme_override_colors/font_color = Color(0.9, 0.8, 0.5, 1)
-theme_override_font_sizes/font_size = 20
-text = "🏰
-Château
-Royal"
-flat = true
+[node name="CollisionShape2D" type="CollisionShape2D" parent="InteractionAreas/Town1Area"]
+shape = SubResource("RectangleShape2D_dp5rp")
 
-[node name="Town2Button" type="Button" parent="InteractionButtons"]
-offset_left = 1450.0
-offset_top = 650.0
-offset_right = 1550.0
-offset_bottom = 750.0
-theme_override_colors/font_color = Color(1, 1, 0.8, 1)
-theme_override_font_sizes/font_size = 18
-text = "⚓
-Port
-de l'Est"
-flat = true
+[node name="CastleArea" type="Area2D" parent="InteractionAreas"]
+position = Vector2(960, 540)
 
-[node name="BattleButton" type="Button" parent="InteractionButtons"]
-offset_left = 607.0
-offset_top = 582.0
-offset_right = 757.0
-offset_bottom = 732.0
-theme_override_colors/font_color = Color(1, 0.5, 0.5, 1)
-theme_override_font_sizes/font_size = 20
-text = "⚔️
-Zone de
-Combat"
-flat = true
+[node name="CollisionShape2D" type="CollisionShape2D" parent="InteractionAreas/CastleArea"]
+shape = SubResource("RectangleShape2D_lhxl1")
 
-[node name="BattleIcon" type="Sprite2D" parent="InteractionButtons/BattleButton"]
-modulate = Color(1, 0.3, 0.3, 0.5)
-position = Vector2(75, 75)
+[node name="Town2Area" type="Area2D" parent="InteractionAreas"]
+position = Vector2(1500, 700)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="InteractionAreas/Town2Area"]
+shape = SubResource("RectangleShape2D_jabx1")
+
+[node name="BattleArea" type="Area2D" parent="InteractionAreas"]
+position = Vector2(569, 674)
+
+[node name="Sprite2D" type="Sprite2D" parent="InteractionAreas/BattleArea"]
 texture = ExtResource("2_lhxl1")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="InteractionAreas/BattleArea"]
+shape = SubResource("CircleShape2D_dp5rp")
+debug_color = Color(0.73333335, 0.08235294, 0, 0.41960785)
