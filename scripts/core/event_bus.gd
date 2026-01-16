@@ -2,7 +2,7 @@ extends Node
 ## EventBus - Hub de communication global découplé
 ## Permet aux scènes de communiquer sans dépendances directes
 
-class_name EventBus
+# class_name EventBus
 
 # ============================================================================
 # SIGNAUX GLOBAUX DU JEU

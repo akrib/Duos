@@ -34,10 +34,10 @@ enum SceneID {
 # Registre des chemins de scènes
 const SCENE_PATHS: Dictionary = {
 	# Menus
-	SceneID.MAIN_MENU: "res://scenes/menus/main_menu.tscn",
-	SceneID.OPTIONS_MENU: "res://scenes/menus/options_menu.tscn",
-	SceneID.PAUSE_MENU: "res://scenes/menus/pause_menu.tscn",
-	SceneID.SAVE_LOAD_MENU: "res://scenes/menus/save_load_menu.tscn",
+	SceneID.MAIN_MENU: "res://scenes/menu/main_menu.tscn",
+	SceneID.OPTIONS_MENU: "res://scenes/menu/options_menu.tscn",
+	SceneID.PAUSE_MENU: "res://scenes/menu/pause_menu.tscn",
+	SceneID.SAVE_LOAD_MENU: "res://scenes/menu/save_load_menu.tscn",
 	
 	# Monde
 	SceneID.WORLD_MAP: "res://scenes/world/world_map.tscn",

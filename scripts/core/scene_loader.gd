@@ -119,7 +119,7 @@ func _load_scene_async(scene_path: String) -> Node:
 			scene_loading_progress.emit(loading_progress)
 		
 		await get_tree().process_frame
-
+	return null
 ## Auto-détection et connexion des signaux
 func _auto_connect_signals(node: Node) -> void:
 	"""Détecte et connecte automatiquement les signaux d'une scène"""
