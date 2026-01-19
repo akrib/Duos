@@ -106,7 +106,11 @@ func safe_connect(signal_name: String, callable: Callable, flags: int = 0) -> vo
 	if signal_name == "battle_started" and _battle_data_ready:
 		print("[EventBus] ✅ Listener de combat connecté, envoi des données en attente")
 		callable.call(_pending_battle_data)
-		_clear_battle_data()
+		# _clear_battle_data()
+
+func clear_battle_data() -> void:
+	"""Nettoie manuellement les données de combat - à appeler par le récepteur"""
+	_clear_battle_data()
 
 ## Déconnexion sécurisée
 func safe_disconnect(signal_name: String, callable: Callable) -> void:

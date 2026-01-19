@@ -120,6 +120,9 @@ func initialize_battle(data: Dictionary) -> void:
 	await _spawn_units(data.get("player_units", []), data.get("enemy_units", []))
 	await _start_battle()
 	
+		# ✅ NOUVEAU : Nettoyer maintenant que tout est chargé
+	EventBus.clear_battle_data()
+	
 	print("[BattleMapManager3D] Combat prêt !")
 	battle_map_ready.emit()
 
