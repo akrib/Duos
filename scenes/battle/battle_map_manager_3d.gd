@@ -1,6 +1,6 @@
 extends Node3D
 ## BattleMapManager3D - Gestionnaire principal du combat en 3D
-## Version 3D avec caméra rotative et raycasting pour interactions
+## Version avec menu d'actions et système de duo
 
 class_name BattleMapManager3D
 
@@ -26,6 +26,15 @@ enum TurnPhase {
 	DEFEAT
 }
 
+enum ActionState {
+	IDLE,              # Aucune action en cours
+	UNIT_SELECTED,     # Unité sélectionnée, menu ouvert
+	CHOOSING_DUO,      # En train de choisir un partenaire de duo
+	SHOWING_MOVE,      # Affichage des cases de mouvement
+	SHOWING_ATTACK,    # Affichage des cases d'attaque
+	EXECUTING_ACTION   # En train d'exécuter une action
+}
+
 # ============================================================================
 # RÉFÉRENCES UI
 # ============================================================================
@@ -36,6 +45,32 @@ enum TurnPhase {
 @onready var camera: Camera3D = $CameraRig/Camera3D
 @onready var ui_layer: CanvasLayer = $UILayer
 @onready var battle_ui: Control = $UILayer/BattleUI
+
+# Menu d'actions
+@onready var action_popup: PopupPanel = $UILayer/BattleUI/ActionPopup
+@onready var move_button: Button = $UILayer/BattleUI/ActionPopup/VBoxContainer/MoveButton
+@onready var attack_button: Button = $UILayer/BattleUI/ActionPopup/VBoxContainer/AttackButton
+@onready var defend_button: Button = $UILayer/BattleUI/ActionPopup/VBoxContainer/DefendButton
+@onready var abilities_button: Button = $UILayer/BattleUI/ActionPopup/VBoxContainer/AbilitiesButton
+@onready var items_button: Button = $UILayer/BattleUI/ActionPopup/VBoxContainer/ItemsButton
+@onready var wait_action_button: Button = $UILayer/BattleUI/ActionPopup/VBoxContainer/WaitActionButton
+@onready var cancel_button: Button = $UILayer/BattleUI/ActionPopup/VBoxContainer/CancelButton
+
+# Menu de sélection de duo
+@onready var duo_popup: PopupPanel = $UILayer/BattleUI/DuoSelectionPopup
+@onready var duo_units_container: VBoxContainer = $UILayer/BattleUI/DuoSelectionPopup/VBoxContainer/UnitsContainer
+@onready var solo_button: Button = $UILayer/BattleUI/DuoSelectionPopup/VBoxContainer/SoloButton
+@onready var cancel_duo_button: Button = $UILayer/BattleUI/DuoSelectionPopup/VBoxContainer/CancelDuoButton
+
+# Labels d'info
+@onready var unit_name_label: Label = $UILayer/BattleUI/BottomBar/MarginContainer/HBoxContainer/UnitInfoPanel/VBoxContainer/UnitNameLabel
+@onready var hp_label: Label = $UILayer/BattleUI/BottomBar/MarginContainer/HBoxContainer/UnitInfoPanel/VBoxContainer/HPLabel
+@onready var stats_label: Label = $UILayer/BattleUI/BottomBar/MarginContainer/HBoxContainer/UnitInfoPanel/VBoxContainer/StatsLabel
+@onready var turn_label: Label = $UILayer/BattleUI/TopBar/MarginContainer/HBoxContainer/TurnLabel
+@onready var phase_label: Label = $UILayer/BattleUI/TopBar/MarginContainer/HBoxContainer/PhaseLabel
+
+# Boutons de contrôle
+@onready var end_turn_button: Button = $UILayer/BattleUI/BottomBar/MarginContainer/HBoxContainer/ButtonsContainer/EndTurnButton
 
 # ============================================================================
 # MODULES
@@ -59,10 +94,10 @@ const GRID_WIDTH: int = 20
 const GRID_HEIGHT: int = 15
 
 # Configuration caméra
-const CAMERA_ROTATION_SPEED: float = 90.0  # Degrés par seconde
+const CAMERA_ROTATION_SPEED: float = 90.0
 const CAMERA_DISTANCE: float = 15.0
 const CAMERA_HEIGHT: float = 12.0
-const CAMERA_ANGLE: float = 45.0  # Angle de la caméra (degrés)
+const CAMERA_ANGLE: float = 45.0
 
 # Couleurs de highlight
 const MOVEMENT_COLOR: Color = Color(0.3, 0.6, 1.0, 0.5)
@@ -76,7 +111,9 @@ var battle_data: Dictionary = {}
 var current_phase: TurnPhase = TurnPhase.PLAYER_TURN
 var current_turn: int = 1
 var selected_unit: BattleUnit3D = null
+var duo_partner: BattleUnit3D = null
 var is_battle_active: bool = false
+var current_action_state: ActionState = ActionState.IDLE
 
 # Caméra
 var camera_rotation_target: float = 0.0
@@ -92,18 +129,35 @@ var mouse_ray_length: float = 1000.0
 
 func _ready() -> void:
 	_setup_camera()
+	_connect_ui_buttons()
 	_connect_to_event_bus()
 	print("[BattleMapManager3D] Initialisé")
 
 func _setup_camera() -> void:
-	"""Configure la caméra initiale"""
 	camera_rig.position = Vector3.ZERO
 	camera_rotation_current = 0.0
 	camera_rotation_target = 0.0
 	_update_camera_position()
 
+func _connect_ui_buttons() -> void:
+	"""Connecte tous les boutons de l'interface"""
+	# Menu d'actions
+	move_button.pressed.connect(_on_move_pressed)
+	attack_button.pressed.connect(_on_attack_pressed)
+	defend_button.pressed.connect(_on_defend_pressed)
+	abilities_button.pressed.connect(_on_abilities_pressed)
+	items_button.pressed.connect(_on_items_pressed)
+	wait_action_button.pressed.connect(_on_wait_action_pressed)
+	cancel_button.pressed.connect(_on_cancel_action_pressed)
+	
+	# Menu de duo
+	solo_button.pressed.connect(_on_solo_attack_pressed)
+	cancel_duo_button.pressed.connect(_on_cancel_duo_pressed)
+	
+	# Boutons de contrôle
+	end_turn_button.pressed.connect(_on_end_turn_pressed)
+
 func initialize_battle(data: Dictionary) -> void:
-	"""Initialise un combat avec les données fournies"""
 	if is_battle_active:
 		push_warning("[BattleMapManager3D] Combat déjà en cours")
 		return
@@ -113,68 +167,44 @@ func initialize_battle(data: Dictionary) -> void:
 	
 	print("[BattleMapManager3D] Initialisation du combat 3D...")
 	
-	print("[BattleMapManager3D] 🔍 Début _initialize_battle avec data: ", data.keys())
-	
 	await _initialize_modules()
-	print("[BattleMapManager3D] ✅ Modules initialisés")
-	
 	await _load_terrain(data.get("terrain", "plains"))
-	print("[BattleMapManager3D] ✅ Terrain chargé")
-	
-	print("[BattleMapManager3D] 🔍 Chargement des objectifs: ", data.get("objectives", {}))
 	await _load_objectives(data.get("objectives", {}))
-	print("[BattleMapManager3D] ✅ Objectifs chargés")
-	
-	print("[BattleMapManager3D] 🔍 Chargement du scénario: ", data.get("scenario", {}))
 	await _load_scenario(data.get("scenario", {}))
-	print("[BattleMapManager3D] ✅ Scénario chargé")
-	
-	print("[BattleMapManager3D] 🔍 Spawn des unités - Joueur: ", data.get("player_units", []).size(), " Ennemi: ", data.get("enemy_units", []).size())
 	await _spawn_units(data.get("player_units", []), data.get("enemy_units", []))
-	print("[BattleMapManager3D] ✅ Unités spawned")
-	
 	await _start_battle()
-	print("[BattleMapManager3D] ✅ Combat démarré")
 	
-		# ✅ NOUVEAU : Nettoyer maintenant que tout est chargé
 	EventBus.clear_battle_data()
 	
 	print("[BattleMapManager3D] Combat prêt !")
 	battle_map_ready.emit()
 
 # ============================================================================
-# INITIALISATION DES MODULES
+# INITIALISATION DES MODULES (identique)
 # ============================================================================
 
 func _initialize_modules() -> void:
-	"""Crée et initialise tous les modules 3D"""
-	
-	# Terrain 3D
 	terrain_module = TerrainModule3D.new()
 	terrain_module.tile_size = TILE_SIZE
 	terrain_module.grid_width = GRID_WIDTH
 	terrain_module.grid_height = GRID_HEIGHT
 	grid_container.add_child(terrain_module)
 	
-	# Unit Manager 3D
 	unit_manager = UnitManager3D.new()
 	unit_manager.tile_size = TILE_SIZE
 	unit_manager.terrain = terrain_module
 	units_container.add_child(unit_manager)
 	
-	# Movement Module 3D
 	movement_module = MovementModule3D.new()
 	movement_module.terrain = terrain_module
 	movement_module.unit_manager = unit_manager
 	add_child(movement_module)
 	
-	# Action Module 3D
 	action_module = ActionModule3D.new()
 	action_module.unit_manager = unit_manager
 	action_module.terrain = terrain_module
 	add_child(action_module)
 	
-	# Modules non-3D (réutilisés)
 	objective_module = ObjectiveModule.new()
 	add_child(objective_module)
 	
@@ -196,7 +226,6 @@ func _initialize_modules() -> void:
 	print("[BattleMapManager3D] Modules 3D initialisés")
 
 func _connect_modules() -> void:
-	"""Connecte les signaux entre modules"""
 	unit_manager.unit_died.connect(_on_unit_died)
 	unit_manager.unit_moved.connect(_on_unit_moved)
 	movement_module.movement_completed.connect(stats_tracker.record_movement)
@@ -205,7 +234,7 @@ func _connect_modules() -> void:
 	objective_module.all_objectives_completed.connect(_on_victory)
 
 # ============================================================================
-# CHARGEMENT
+# CHARGEMENT (identique)
 # ============================================================================
 
 func _load_terrain(terrain_data: Variant) -> void:
@@ -213,30 +242,21 @@ func _load_terrain(terrain_data: Variant) -> void:
 		terrain_module.load_preset(terrain_data)
 	elif typeof(terrain_data) == TYPE_DICTIONARY:
 		terrain_module.load_custom(terrain_data)
-	#await terrain_module.generation_complete
 	print("[BattleMapManager3D] Terrain 3D chargé")
 
 func _load_objectives(objectives_data: Dictionary) -> void:
-	print("[BattleMapManager3D] 📋 _load_objectives appelé avec: ", objectives_data)
 	if objectives_data.is_empty():
-		print("[BattleMapManager3D] ⚠️ Aucun objectif fourni")
-		return	
+		return
 	objective_module.setup_objectives(objectives_data)
 	await get_tree().process_frame
 
 func _load_scenario(scenario_data: Dictionary) -> void:
-	print("[BattleMapManager3D] 📜 _load_scenario appelé avec: ", scenario_data)
 	if scenario_data.is_empty():
-		print("[BattleMapManager3D] ⚠️ Aucun scénario fourni")
 		return
 	scenario_module.setup_scenario(scenario_data)
 	await get_tree().process_frame
 
 func _spawn_units(player_units: Array, enemy_units: Array) -> void:
-	print("[BattleMapManager3D] 👥 _spawn_units appelé - Joueur: ", player_units.size(), " Ennemi: ", enemy_units.size())
-	if player_units.is_empty() and enemy_units.is_empty():
-		print("[BattleMapManager3D] ⚠️ Aucune unité à spawner !")
-		return
 	for unit_data in player_units:
 		var unit = unit_manager.spawn_unit(unit_data, true)
 		if unit:
@@ -264,16 +284,18 @@ func _start_battle() -> void:
 	_start_player_turn()
 
 # ============================================================================
-# GESTION DES TOURS (identique)
+# GESTION DES TOURS
 # ============================================================================
 
 func change_phase(new_phase: TurnPhase) -> void:
 	current_phase = new_phase
 	turn_phase_changed.emit(new_phase)
+	phase_label.text = "Phase: " + TurnPhase.keys()[new_phase]
 	print("[BattleMapManager3D] Phase: ", TurnPhase.keys()[new_phase])
 
 func _start_player_turn() -> void:
 	print("[BattleMapManager3D] === Tour ", current_turn, " - JOUEUR ===")
+	turn_label.text = "Tour " + str(current_turn)
 	unit_manager.reset_player_units()
 	scenario_module.trigger_turn_event(current_turn, true)
 	set_process_input(true)
@@ -303,6 +325,10 @@ func _end_enemy_turn() -> void:
 	await get_tree().create_timer(0.5).timeout
 	_start_player_turn()
 
+func _on_end_turn_pressed() -> void:
+	"""Bouton Fin de Tour"""
+	_end_player_turn()
+
 # ============================================================================
 # PROCESS & INPUT 3D
 # ============================================================================
@@ -311,7 +337,6 @@ func _process(delta: float) -> void:
 	_process_camera_rotation(delta)
 
 func _process_camera_rotation(delta: float) -> void:
-	"""Gère la rotation progressive de la caméra"""
 	if is_camera_rotating:
 		var angle_diff = camera_rotation_target - camera_rotation_current
 		
@@ -327,60 +352,49 @@ func _process_camera_rotation(delta: float) -> void:
 			_update_camera_position()
 
 func _update_camera_position() -> void:
-	"""Met à jour la position et rotation de la caméra"""
 	var angle_rad = deg_to_rad(camera_rotation_current)
-	
-	# Position du rig de caméra (rotation autour de l'origine)
 	camera_rig.rotation.y = angle_rad
 	
-	# La caméra reste à distance et angle fixes
 	var cam_angle_rad = deg_to_rad(CAMERA_ANGLE)
-	camera.position = Vector3(
-		0,
-		CAMERA_HEIGHT,
-		CAMERA_DISTANCE
-	)
+	camera.position = Vector3(0, CAMERA_HEIGHT, CAMERA_DISTANCE)
 	camera.rotation.x = -cam_angle_rad
 
 func rotate_camera(degrees: float) -> void:
-	"""Demande une rotation de la caméra"""
 	camera_rotation_target += degrees
-	
-	# Normaliser entre 0 et 360
 	while camera_rotation_target >= 360:
 		camera_rotation_target -= 360
 	while camera_rotation_target < 0:
 		camera_rotation_target += 360
-	
 	is_camera_rotating = true
 
 func _input(event: InputEvent) -> void:
 	if not is_battle_active or current_phase != TurnPhase.PLAYER_TURN:
 		return
 	
-	# Rotation de la caméra avec A/E
-	if event.is_action_pressed("ui_home"):  # A
+	# Rotation de la caméra
+	if event.is_action_pressed("ui_home"):
 		rotate_camera(-90)
-	elif event.is_action_pressed("ui_end"):  # E
+	elif event.is_action_pressed("ui_end"):
 		rotate_camera(90)
 	
 	# Clic souris pour sélection/action
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		_handle_mouse_click(event.position)
+		# Ne pas traiter les clics si un menu est ouvert
+		if not action_popup.visible and not duo_popup.visible:
+			_handle_mouse_click(event.position)
 
 # ============================================================================
 # RAYCASTING & SÉLECTION 3D
 # ============================================================================
 
 func _handle_mouse_click(mouse_pos: Vector2) -> void:
-	"""Gère le clic souris avec raycasting 3D"""
 	var from = camera.project_ray_origin(mouse_pos)
 	var to = from + camera.project_ray_normal(mouse_pos) * mouse_ray_length
 	
 	var space_state = get_world_3d().direct_space_state
 	var query = PhysicsRayQueryParameters3D.create(from, to)
 	query.collide_with_areas = true
-	query.collision_mask = 3  # Layers 1 (terrain) et 2 (units)
+	query.collision_mask = 3
 	
 	var result = space_state.intersect_ray(query)
 	
@@ -388,7 +402,6 @@ func _handle_mouse_click(mouse_pos: Vector2) -> void:
 		_handle_raycast_hit(result)
 
 func _handle_raycast_hit(result: Dictionary) -> void:
-	"""Traite le résultat du raycast"""
 	var collider = result.collider
 	
 	# Clic sur une unité
@@ -405,23 +418,31 @@ func _handle_raycast_hit(result: Dictionary) -> void:
 			_handle_terrain_click(grid_pos)
 
 func _handle_unit_click(unit: BattleUnit3D) -> void:
-	"""Gère le clic sur une unité"""
 	if unit.is_player_unit:
-		_select_unit(unit)
+		# Clic sur unité alliée
+		if current_action_state == ActionState.CHOOSING_DUO:
+			# En train de choisir un partenaire de duo
+			_select_duo_partner(unit)
+		else:
+			# Sélection normale
+			_select_unit(unit)
 	elif selected_unit and selected_unit.can_act():
-		_attack_unit(selected_unit, unit)
+		# Clic sur unité ennemie pendant mode attaque
+		if current_action_state == ActionState.SHOWING_ATTACK:
+			_attack_unit(selected_unit, unit)
 
 func _handle_terrain_click(grid_pos: Vector2i) -> void:
-	"""Gère le clic sur le terrain"""
-	if not selected_unit or not selected_unit.can_move():
+	if not selected_unit or current_action_state != ActionState.SHOWING_MOVE:
 		return
 	
 	if movement_module.can_move_to(selected_unit, grid_pos):
 		await movement_module.move_unit(selected_unit, grid_pos)
 		selected_unit.movement_used = true
+		_close_all_menus()
+		_deselect_unit()
 
 # ============================================================================
-# SÉLECTION D'UNITÉ
+# SÉLECTION D'UNITÉ & MENU D'ACTIONS
 # ============================================================================
 
 func _select_unit(unit: BattleUnit3D) -> void:
@@ -435,40 +456,231 @@ func _select_unit(unit: BattleUnit3D) -> void:
 	selected_unit.set_selected(true)
 	unit_selected.emit(unit)
 	
-	# Afficher les portées
-	if unit.can_move():
-		var reachable = movement_module.calculate_reachable_positions(unit)
-		terrain_module.highlight_tiles(reachable, MOVEMENT_COLOR)
+	# Mettre à jour les infos UI
+	_update_unit_info_ui(unit)
 	
-	if unit.can_act():
-		var attack_positions = action_module.get_attack_positions(unit)
-		terrain_module.highlight_tiles(attack_positions, ATTACK_COLOR)
+	# Ouvrir le menu d'actions
+	_open_action_menu()
 	
+	current_action_state = ActionState.UNIT_SELECTED
 	print("[BattleMapManager3D] Unité sélectionnée: ", unit.unit_name)
 
 func _deselect_unit() -> void:
 	if selected_unit:
 		selected_unit.set_selected(false)
 		selected_unit = null
+		duo_partner = null
 		unit_deselected.emit()
 		terrain_module.clear_all_highlights()
+		_close_all_menus()
+		_update_unit_info_ui(null)
+		current_action_state = ActionState.IDLE
+
+func _update_unit_info_ui(unit: BattleUnit3D) -> void:
+	if unit:
+		unit_name_label.text = unit.unit_name
+		hp_label.text = "HP: %d/%d" % [unit.current_hp, unit.max_hp]
+		stats_label.text = "ATK: %d | DEF: %d | MOV: %d" % [unit.attack_power, unit.defense_power, unit.movement_range]
+	else:
+		unit_name_label.text = "Aucune unité sélectionnée"
+		hp_label.text = "HP: --/--"
+		stats_label.text = "ATK: -- | DEF: -- | MOV: --"
 
 # ============================================================================
-# ACTIONS
+# MENU D'ACTIONS
+# ============================================================================
+
+func _open_action_menu() -> void:
+	if not selected_unit:
+		return
+	
+	# Positionner le menu près de l'unité sélectionnée
+	var screen_pos = camera.unproject_position(selected_unit.position)
+	action_popup.position = screen_pos + Vector2(50, -100)
+	
+	# Activer/désactiver les boutons selon l'état de l'unité
+	move_button.disabled = not selected_unit.can_move()
+	attack_button.disabled = not selected_unit.can_act()
+	defend_button.disabled = not selected_unit.can_act()
+	abilities_button.disabled = not selected_unit.can_act() or selected_unit.abilities.is_empty()
+	
+	action_popup.popup()
+
+func _close_all_menus() -> void:
+	action_popup.hide()
+	duo_popup.hide()
+	terrain_module.clear_all_highlights()
+
+# ============================================================================
+# ACTIONS DU MENU
+# ============================================================================
+
+func _on_move_pressed() -> void:
+	if not selected_unit or not selected_unit.can_move():
+		return
+	
+	action_popup.hide()
+	current_action_state = ActionState.SHOWING_MOVE
+	
+	# Afficher les cases accessibles
+	var reachable = movement_module.calculate_reachable_positions(selected_unit)
+	terrain_module.highlight_tiles(reachable, MOVEMENT_COLOR)
+	
+	print("[BattleMapManager3D] Mode déplacement activé")
+
+func _on_attack_pressed() -> void:
+	if not selected_unit or not selected_unit.can_act():
+		return
+	
+	action_popup.hide()
+	
+	# Ouvrir le menu de sélection de duo
+	_open_duo_selection_menu()
+
+func _on_defend_pressed() -> void:
+	if not selected_unit or not selected_unit.can_act():
+		return
+	
+	# TODO: Implémenter la défense
+	print("[BattleMapManager3D] Défense (à implémenter)")
+	selected_unit.action_used = true
+	selected_unit.defense_power = int(selected_unit.defense_power * 1.5)
+	_close_all_menus()
+	_deselect_unit()
+
+func _on_abilities_pressed() -> void:
+	if not selected_unit or not selected_unit.can_act():
+		return
+	
+	# TODO: Ouvrir menu des capacités
+	print("[BattleMapManager3D] Capacités (à implémenter)")
+	_close_all_menus()
+
+func _on_items_pressed() -> void:
+	# TODO: Ouvrir menu des objets
+	print("[BattleMapManager3D] Objets (à implémenter)")
+	_close_all_menus()
+
+func _on_wait_action_pressed() -> void:
+	if not selected_unit:
+		return
+	
+	# L'unité passe son tour
+	selected_unit.movement_used = true
+	selected_unit.action_used = true
+	_close_all_menus()
+	_deselect_unit()
+
+func _on_cancel_action_pressed() -> void:
+	_close_all_menus()
+	current_action_state = ActionState.IDLE
+
+# ============================================================================
+# SYSTÈME DE DUO
+# ============================================================================
+
+func _open_duo_selection_menu() -> void:
+	if not selected_unit:
+		return
+	
+	# Nettoyer le container des boutons précédents
+	for child in duo_units_container.get_children():
+		child.queue_free()
+	
+	# Créer un bouton pour chaque unité alliée à portée
+	var allies = unit_manager.get_alive_player_units()
+	var duo_candidates: Array[BattleUnit3D] = []
+	
+	for ally in allies:
+		if ally == selected_unit:
+			continue
+		
+		# Vérifier la distance (duo possible si adjacent ou à portée)
+		var distance = terrain_module.get_distance(selected_unit.grid_position, ally.grid_position)
+		if distance <= 3:  # Portée de duo configurable
+			duo_candidates.append(ally)
+	
+	# Créer les boutons
+	for candidate in duo_candidates:
+		var button = Button.new()
+		button.text = "👥 " + candidate.unit_name
+		button.custom_minimum_size = Vector2(180, 40)
+		button.pressed.connect(func(): _select_duo_partner(candidate))
+		duo_units_container.add_child(button)
+	
+	# Positionner et afficher le popup
+	var screen_pos = camera.unproject_position(selected_unit.position)
+	duo_popup.position = screen_pos + Vector2(50, -200)
+	duo_popup.popup()
+	
+	current_action_state = ActionState.CHOOSING_DUO
+	print("[BattleMapManager3D] Sélection de duo ouverte")
+
+func _select_duo_partner(partner: BattleUnit3D) -> void:
+	if partner == selected_unit:
+		return
+	
+	duo_partner = partner
+	duo_popup.hide()
+	
+	# Afficher la portée d'attaque
+	_show_attack_range()
+	
+	print("[BattleMapManager3D] Duo formé: ", selected_unit.unit_name, " + ", partner.unit_name)
+
+func _on_solo_attack_pressed() -> void:
+	duo_partner = null
+	duo_popup.hide()
+	
+	# Afficher la portée d'attaque en solo
+	_show_attack_range()
+	
+	print("[BattleMapManager3D] Attaque en solo")
+
+func _on_cancel_duo_pressed() -> void:
+	duo_popup.hide()
+	_open_action_menu()
+	current_action_state = ActionState.UNIT_SELECTED
+
+func _show_attack_range() -> void:
+	if not selected_unit:
+		return
+	
+	current_action_state = ActionState.SHOWING_ATTACK
+	
+	# Afficher les cases d'attaque
+	var attack_positions = action_module.get_attack_positions(selected_unit)
+	terrain_module.highlight_tiles(attack_positions, ATTACK_COLOR)
+	
+	print("[BattleMapManager3D] Portée d'attaque affichée")
+
+# ============================================================================
+# ACTIONS DE COMBAT
 # ============================================================================
 
 func _attack_unit(attacker: BattleUnit3D, target: BattleUnit3D) -> void:
 	if not action_module.can_attack(attacker, target):
 		return
 	
+	current_action_state = ActionState.EXECUTING_ACTION
+	
+	# Si duo, notifier le système
+	if duo_partner:
+		EventBus.form_duo(attacker, duo_partner)
+		print("[BattleMapManager3D] Attaque en duo!")
+		# TODO: Appliquer les bonus de duo
+	
 	await action_module.execute_attack(attacker, target)
 	attacker.action_used = true
 	
-	if not attacker.can_act():
-		_deselect_unit()
+	if duo_partner:
+		EventBus.break_duo(attacker, duo_partner)
+	
+	_close_all_menus()
+	_deselect_unit()
 
 # ============================================================================
-# CALLBACKS (identiques à la version 2D)
+# CALLBACKS
 # ============================================================================
 
 func _on_unit_died(unit: BattleUnit3D) -> void:
