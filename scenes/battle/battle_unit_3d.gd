@@ -1,6 +1,6 @@
 extends Node3D
 ## BattleUnit3D - Unité de combat avec sprite billboard
-## Version corrigée : cercle horizontal, UI en billboard, pas d'ombres
+## Version corrigée : cercle horizontal, team indicator enfant de HP bar, barre de vie verte
 
 class_name BattleUnit3D
 
@@ -68,8 +68,7 @@ var sprite_3d: Sprite3D
 var hp_bar_container: Node3D  # Container pour billboard
 var hp_bar_3d: MeshInstance3D
 var hp_bar_bg: MeshInstance3D
-var team_indicator_container: Node3D  # Container pour billboard
-var team_indicator: MeshInstance3D
+var team_indicator: MeshInstance3D  # ← Maintenant enfant de hp_bar_container
 var selection_indicator: MeshInstance3D
 var shadow_sprite: Sprite3D
 
@@ -111,13 +110,10 @@ func _create_visuals_3d() -> void:
 	selection_indicator.visible = false
 	add_child(selection_indicator)
 	
-	# 4. BARRE DE HP (au-dessus du sprite - BILLBOARD)
-	_create_hp_bar_with_billboard()
+	# 4. BARRE DE HP avec TEAM INDICATOR (au-dessus du sprite - BILLBOARD)
+	_create_hp_bar_with_team_indicator()
 	
-	# 5. INDICATEUR D'ÉQUIPE (petit cube - BILLBOARD)
-	_create_team_indicator_with_billboard()
-	
-	# 6. COLLISION POUR LE RAYCASTING
+	# 5. COLLISION POUR LE RAYCASTING
 	_create_collision()
 	
 	# Forcer la visibilité
@@ -184,8 +180,9 @@ func _create_selection_ring() -> MeshInstance3D:
 	
 	mesh_instance.mesh = torus
 	
-	# CORRECTION : Rotation pour mettre l'anneau horizontal au sol
-	mesh_instance.rotation.x = PI / 2  # 90 degrés sur X = horizontal
+	# ✅ CORRECTION : Rotation pour mettre l'anneau horizontal au sol
+	# Le TorusMesh est vertical par défaut (axe Y), on le tourne de -90° sur X
+	mesh_instance.rotation_degrees.x = -90  # Horizontal au sol
 	mesh_instance.position.y = 0.08  # Légèrement au-dessus du sol
 	
 	# Matériau émissif jaune
@@ -203,8 +200,8 @@ func _create_selection_ring() -> MeshInstance3D:
 	
 	return mesh_instance
 
-func _create_hp_bar_with_billboard() -> void:
-	"""Crée une barre de HP avec billboard pour suivre la caméra"""
+func _create_hp_bar_with_team_indicator() -> void:
+	"""Crée une barre de HP avec team indicator comme enfant"""
 	
 	# Container qui va faire le billboard
 	hp_bar_container = Node3D.new()
@@ -212,7 +209,7 @@ func _create_hp_bar_with_billboard() -> void:
 	hp_bar_container.top_level = false
 	add_child(hp_bar_container)
 	
-	# Fond de la barre (noir/gris)
+	# ========== FOND DE LA BARRE (gris foncé) ==========
 	hp_bar_bg = MeshInstance3D.new()
 	var bg_box = BoxMesh.new()
 	bg_box.size = Vector3(tile_size * 0.8, 0.08, 0.02)
@@ -221,61 +218,67 @@ func _create_hp_bar_with_billboard() -> void:
 	var bg_material = StandardMaterial3D.new()
 	bg_material.albedo_color = Color(0.2, 0.2, 0.2)
 	bg_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	bg_material.cull_mode = BaseMaterial3D.CULL_DISABLED  # Visible des deux côtés
 	hp_bar_bg.set_surface_override_material(0, bg_material)
 	hp_bar_bg.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	hp_bar_container.add_child(hp_bar_bg)
 	
-	# Barre de HP avant-plan (couleur HP)
+	# ========== BARRE DE HP AVANT-PLAN (verte) ==========
 	hp_bar_3d = MeshInstance3D.new()
 	var box = BoxMesh.new()
-	box.size = Vector3(tile_size * 0.8, 0.06, 0.02)
+	box.size = Vector3(tile_size * 0.8, 0.06, 0.03)  # ← Plus épais en Z pour être bien visible
 	hp_bar_3d.mesh = box
-	hp_bar_3d.position.z = 0.011  # Légèrement devant le fond
 	
+	# ✅ CORRECTION : Position devant le fond (Z plus grand)
+	hp_bar_3d.position.z = 0.025  # ← Bien devant le fond (0.03/2 + margin)
+	
+	# ✅ CORRECTION : Material vert avec culling désactivé
 	var material = StandardMaterial3D.new()
 	material.albedo_color = Color.GREEN
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED  # Visible des deux côtés
+	material.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS  # Toujours dessiner
 	hp_bar_3d.set_surface_override_material(0, material)
 	hp_bar_3d.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	hp_bar_container.add_child(hp_bar_3d)
-
-func _create_team_indicator_with_billboard() -> void:
-	"""Crée un indicateur d'équipe avec billboard"""
 	
-	# Container qui va faire le billboard
-	team_indicator_container = Node3D.new()
-	team_indicator_container.position = Vector3(tile_size * 0.35, sprite_height + 0.3, 0)
-	team_indicator_container.top_level = false
-	add_child(team_indicator_container)
-	
-	# Cube indicateur
+	# ========== ✅ TEAM INDICATOR (cube enfant de la barre) ==========
 	team_indicator = MeshInstance3D.new()
-	var box = BoxMesh.new()
-	box.size = Vector3(0.15, 0.15, 0.02)
-	team_indicator.mesh = box
+	var indicator_box = BoxMesh.new()
+	indicator_box.size = Vector3(0.12, 0.12, 0.03)
+	team_indicator.mesh = indicator_box
 	
-	var material = StandardMaterial3D.new()
-	material.albedo_color = Color.GREEN if is_player_unit else Color.RED
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.emission_enabled = true
-	material.emission = material.albedo_color * 0.5
-	team_indicator.set_surface_override_material(0, material)
+	# Position en bas à droite de la barre de vie
+	var bar_width = tile_size * 0.8
+	var bar_height = 0.08
+	team_indicator.position = Vector3(
+		bar_width / 2 + 0.08,  # À droite de la barre
+		-bar_height / 2,        # En bas de la barre
+		0.025                   # Devant
+	)
+	
+	# Material selon l'équipe
+	var team_material = StandardMaterial3D.new()
+	team_material.albedo_color = Color.GREEN if is_player_unit else Color.RED
+	team_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	team_material.emission_enabled = true
+	team_material.emission = team_material.albedo_color * 0.5
+	team_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	team_indicator.set_surface_override_material(0, team_material)
 	team_indicator.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	team_indicator_container.add_child(team_indicator)
+	
+	# ✅ Ajouter comme enfant de hp_bar_container (pas un container séparé)
+	hp_bar_container.add_child(team_indicator)
 
 func _process(_delta: float) -> void:
-	"""Faire tourner les UI vers la caméra"""
-	# Trouver la caméra
+	"""Faire tourner la barre HP (avec team indicator) vers la caméra"""
 	var camera = get_viewport().get_camera_3d()
 	if not camera:
 		return
 	
-	# Faire tourner les containers UI vers la caméra (billboard manuel)
+	# Billboard manuel pour la barre HP et son team indicator
 	if hp_bar_container:
 		hp_bar_container.look_at(camera.global_position, Vector3.UP)
-	
-	if team_indicator_container:
-		team_indicator_container.look_at(camera.global_position, Vector3.UP)
 
 func _create_collision() -> void:
 	"""Crée une collision pour le raycasting"""
@@ -403,20 +406,20 @@ func set_selected(selected: bool) -> void:
 
 func _update_hp_bar() -> void:
 	"""Met à jour la barre de HP 3D"""
-	if not hp_bar_3d:
+	if not hp_bar_3d or not hp_bar_3d.mesh:
 		return
 	
 	var hp_percent = get_hp_percentage()
 	
-	# Redimensionner la barre
+	# ✅ Redimensionner la barre
 	var box_mesh = hp_bar_3d.mesh as BoxMesh
 	if box_mesh:
 		box_mesh.size.x = tile_size * 0.8 * hp_percent
 	
-	# Déplacer pour garder aligné à gauche
+	# ✅ Déplacer pour garder aligné à gauche
 	hp_bar_3d.position.x = -(tile_size * 0.8 * (1.0 - hp_percent)) / 2.0
 	
-	# Changer la couleur
+	# ✅ Changer la couleur selon le % de HP
 	var material = hp_bar_3d.get_surface_override_material(0) as StandardMaterial3D
 	if material:
 		if hp_percent > 0.6:
