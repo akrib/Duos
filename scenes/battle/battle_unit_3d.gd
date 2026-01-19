@@ -426,3 +426,80 @@ func get_unit_data() -> Dictionary:
 		"can_move": can_move(),
 		"can_act": can_act()
 	}
+
+# ============================================================================
+# INITIALISATION DEPUIS DONNÉES
+# ============================================================================
+
+func initialize_unit(data: Dictionary) -> void:
+	"""Initialise l'unité à partir d'un dictionnaire de données"""
+	
+	# Identité
+	if data.has("name"):
+		unit_name = data.name
+	if data.has("id"):
+		unit_id = data.id
+	elif unit_id == "":
+		unit_id = unit_name + "_" + str(Time.get_ticks_msec())
+	
+	if data.has("is_player"):
+		is_player_unit = data.is_player
+	
+	# Position
+	if data.has("position"):
+		grid_position = data.position
+	
+	# Stats
+	if data.has("stats"):
+		var stats = data.stats
+		if stats.has("hp"):
+			max_hp = stats.hp
+			current_hp = max_hp
+		if stats.has("attack"):
+			attack_power = stats.attack
+		if stats.has("defense"):
+			defense_power = stats.defense
+		if stats.has("movement"):
+			movement_range = stats.movement
+		if stats.has("range"):
+			attack_range = stats.range
+	
+	# Stats directes (format alternatif)
+	if data.has("hp"):
+		current_hp = data.hp
+	if data.has("max_hp"):
+		max_hp = data.max_hp
+	if data.has("attack"):
+		attack_power = data.attack
+	if data.has("defense"):
+		defense_power = data.defense
+	if data.has("movement"):
+		movement_range = data.movement
+	if data.has("range"):
+		attack_range = data.range
+	
+	# Capacités (avec conversion de type sécurisée)
+	if data.has("abilities"):
+		abilities.clear()
+		var abilities_array = data.abilities
+		if abilities_array is Array:
+			for ability in abilities_array:
+				if ability is String:
+					abilities.append(ability)
+	
+	# Effets de statut
+	if data.has("status_effects"):
+		status_effects.clear()
+		var effects = data.status_effects
+		if effects is Dictionary:
+			for effect_name in effects:
+				status_effects[effect_name] = effects[effect_name]
+	
+	# Apparence
+	if data.has("color"):
+		unit_color = data.color
+	else:
+		# Couleur par défaut selon l'équipe
+		unit_color = Color(0.2, 0.2, 0.8) if is_player_unit else Color(0.8, 0.2, 0.2)
+	
+	print("[BattleUnit3D] Unité initialisée: ", unit_name, " (", unit_id, ")")

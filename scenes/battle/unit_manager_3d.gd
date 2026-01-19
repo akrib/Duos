@@ -34,40 +34,23 @@ var unit_grid: Dictionary = {}  # Vector2i -> BattleUnit3D
 func spawn_unit(unit_data: Dictionary, is_player: bool) -> BattleUnit3D:
 	"""Spawne une unité 3D sur le terrain"""
 	
-		# === DÉBUT DEBUG ===
+	# === DEBUG ===
 	print("\n[UnitManager3D] 🎯 Spawning unit: ", unit_data.get("name", "UNKNOWN"))
 	print("  - is_player: ", is_player)
 	print("  - grid_position from data: ", unit_data.get("position", Vector2i(-1, -1)))
-	# === FIN DEBUG ===
 	
+	# Créer l'unité
 	var unit = BattleUnit3D.new()
 	
-	# Configuration
-	unit.unit_name = unit_data.get("name", "Unit")
+	# Configuration de base
 	unit.is_player_unit = is_player
 	unit.tile_size = tile_size
 	
-	# Stats
-	var stats = unit_data.get("stats", {})
-	unit.max_hp = stats.get("hp", 100)
-	unit.current_hp = unit.max_hp
-	unit.attack_power = stats.get("attack", 20)
-	unit.defense_power = stats.get("defense", 10)
-	unit.movement_range = stats.get("movement", 5)
-	unit.attack_range = stats.get("range", 1)
+	# Initialiser avec les données
+	unit.initialize_unit(unit_data)
 	
-	# Apparence
-	if unit_data.has("color"):
-		unit.unit_color = unit_data.color
-	else:
-		unit.unit_color = Color(0.2, 0.2, 0.8) if is_player else Color(0.8, 0.2, 0.2)
-	
-	# Capacités
-	unit.abilities = unit_data.get("abilities", [])
-	
-	# Position
-	var spawn_pos = unit_data.get("position", Vector2i(0, 0))
-	unit.grid_position = spawn_pos
+	# Position 3D
+	var spawn_pos = unit.grid_position
 	unit.position = _grid_to_world_3d(spawn_pos)
 	
 	# Ajouter à la scène
