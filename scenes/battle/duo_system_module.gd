@@ -1,12 +1,12 @@
 extends Node
 class_name DuoSystemModule
 
-signal duo_formed(unit_a: BattleUnit, unit_b: BattleUnit)
-signal duo_broken(unit_a: BattleUnit, unit_b: BattleUnit)
+signal duo_formed(unit_a: BattleUnit3D, unit_b: BattleUnit3D)
+signal duo_broken(unit_a: BattleUnit3D, unit_b: BattleUnit3D)
 
 var active_duos: Array[Array] = []  # [[unit_a, unit_b], ...]
 
-func check_duo_formation(unit: BattleUnit, unit_manager: UnitManager) -> void:
+func check_duo_formation(unit: BattleUnit3D, unit_manager: UnitManager3D) -> void:
 	# Vérifie si un duo peut se former
 	pass
 

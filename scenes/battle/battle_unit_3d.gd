@@ -1,6 +1,6 @@
 extends Node3D
 ## BattleUnit3D - Unité de combat avec sprite billboard
-## Version 3D utilisant Sprite3D qui fait toujours face à la caméra
+## Version corrigée : cercle horizontal, UI en billboard, pas d'ombres
 
 class_name BattleUnit3D
 
@@ -65,7 +65,11 @@ var is_selected: bool = false
 
 # Visuels 3D
 var sprite_3d: Sprite3D
+var hp_bar_container: Node3D  # Container pour billboard
 var hp_bar_3d: MeshInstance3D
+var hp_bar_bg: MeshInstance3D
+var team_indicator_container: Node3D  # Container pour billboard
+var team_indicator: MeshInstance3D
 var selection_indicator: MeshInstance3D
 var shadow_sprite: Sprite3D
 
@@ -88,8 +92,9 @@ func _create_visuals_3d() -> void:
 	shadow_sprite.billboard = BaseMaterial3D.BILLBOARD_DISABLED
 	shadow_sprite.texture = _create_circle_texture(64, Color(0, 0, 0, 0.3))
 	shadow_sprite.pixel_size = 0.02
-	shadow_sprite.rotation.x = -PI / 2  # Horizontal
+	shadow_sprite.rotation.x = -PI / 2  # Horizontal au sol
 	shadow_sprite.position.y = 0.05
+	shadow_sprite.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(shadow_sprite)
 	
 	# 2. SPRITE PRINCIPAL (Billboard)
@@ -98,24 +103,24 @@ func _create_visuals_3d() -> void:
 	sprite_3d.texture = _create_unit_texture()
 	sprite_3d.pixel_size = 0.01
 	sprite_3d.position.y = sprite_height
+	sprite_3d.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(sprite_3d)
 	
-	# 3. INDICATEUR DE SÉLECTION (anneau au sol)
+	# 3. INDICATEUR DE SÉLECTION (anneau au sol - HORIZONTAL)
 	selection_indicator = _create_selection_ring()
 	selection_indicator.visible = false
 	add_child(selection_indicator)
 	
-	# 4. BARRE DE HP (au-dessus du sprite)
-	hp_bar_3d = _create_hp_bar_3d()
-	add_child(hp_bar_3d)
+	# 4. BARRE DE HP (au-dessus du sprite - BILLBOARD)
+	_create_hp_bar_with_billboard()
 	
-	# 5. INDICATEUR D'ÉQUIPE (petit cube)
-	var team_indicator = _create_team_indicator()
-	add_child(team_indicator)
+	# 5. INDICATEUR D'ÉQUIPE (petit cube - BILLBOARD)
+	_create_team_indicator_with_billboard()
 	
 	# 6. COLLISION POUR LE RAYCASTING
 	_create_collision()
-# Forcer la visibilité de tous les éléments
+	
+	# Forcer la visibilité
 	visible = true
 	show()
 	
@@ -125,14 +130,13 @@ func _create_visuals_3d() -> void:
 			child.show()
 	
 	print("[BattleUnit3D] 👁️ Visuals created for ", unit_name)
-	print("  - Children: ", get_child_count())
 
 func _create_unit_texture() -> ImageTexture:
 	"""Crée une texture simple pour le sprite de l'unité"""
 	var image = Image.create(128, 128, false, Image.FORMAT_RGBA8)
 	image.fill(Color.TRANSPARENT)
 	
-	# Dessiner un cercle coloré (représentation simple)
+	# Dessiner un cercle coloré
 	for y in range(128):
 		for x in range(128):
 			var dx = x - 64
@@ -168,64 +172,110 @@ func _create_circle_texture(size: int, color: Color) -> ImageTexture:
 	return ImageTexture.create_from_image(image)
 
 func _create_selection_ring() -> MeshInstance3D:
-	"""Crée un anneau de sélection au sol"""
+	"""Crée un anneau de sélection au sol - HORIZONTAL"""
 	var mesh_instance = MeshInstance3D.new()
 	
 	# Utiliser un TorusMesh pour l'anneau
 	var torus = TorusMesh.new()
-	torus.inner_radius = tile_size * 0.4
-	torus.outer_radius = tile_size * 0.5
-	torus.rings = 16
-	torus.ring_segments = 32
+	torus.inner_radius = tile_size * 0.35
+	torus.outer_radius = tile_size * 0.45
+	torus.rings = 24
+	torus.ring_segments = 48
 	
 	mesh_instance.mesh = torus
-	mesh_instance.rotation.x = PI / 2  # Horizontal
-	mesh_instance.position.y = 0.1
 	
+	# CORRECTION : Rotation pour mettre l'anneau horizontal au sol
+	mesh_instance.rotation.x = PI / 2  # 90 degrés sur X = horizontal
+	mesh_instance.position.y = 0.08  # Légèrement au-dessus du sol
+	
+	# Matériau émissif jaune
 	var material = StandardMaterial3D.new()
 	material.albedo_color = Color.YELLOW
 	material.emission_enabled = true
-	material.emission = Color.YELLOW * 0.5
+	material.emission = Color.YELLOW * 0.8
+	material.emission_energy_multiplier = 2.0
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	
+	# PAS D'OMBRES
+	mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	
 	mesh_instance.set_surface_override_material(0, material)
 	
 	return mesh_instance
 
-func _create_hp_bar_3d() -> MeshInstance3D:
-	"""Crée une barre de HP 3D au-dessus du sprite"""
-	var mesh_instance = MeshInstance3D.new()
+func _create_hp_bar_with_billboard() -> void:
+	"""Crée une barre de HP avec billboard pour suivre la caméra"""
 	
+	# Container qui va faire le billboard
+	hp_bar_container = Node3D.new()
+	hp_bar_container.position = Vector3(0, sprite_height + 0.6, 0)
+	hp_bar_container.top_level = false
+	add_child(hp_bar_container)
+	
+	# Fond de la barre (noir/gris)
+	hp_bar_bg = MeshInstance3D.new()
+	var bg_box = BoxMesh.new()
+	bg_box.size = Vector3(tile_size * 0.8, 0.08, 0.02)
+	hp_bar_bg.mesh = bg_box
+	
+	var bg_material = StandardMaterial3D.new()
+	bg_material.albedo_color = Color(0.2, 0.2, 0.2)
+	bg_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	hp_bar_bg.set_surface_override_material(0, bg_material)
+	hp_bar_bg.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	hp_bar_container.add_child(hp_bar_bg)
+	
+	# Barre de HP avant-plan (couleur HP)
+	hp_bar_3d = MeshInstance3D.new()
 	var box = BoxMesh.new()
-	box.size = Vector3(tile_size * 0.8, 0.05, 0.1)
-	mesh_instance.mesh = box
-	
-	mesh_instance.position = Vector3(0, sprite_height + 0.6, 0)
+	box.size = Vector3(tile_size * 0.8, 0.06, 0.02)
+	hp_bar_3d.mesh = box
+	hp_bar_3d.position.z = 0.011  # Légèrement devant le fond
 	
 	var material = StandardMaterial3D.new()
 	material.albedo_color = Color.GREEN
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mesh_instance.set_surface_override_material(0, material)
-	
-	# Rendre le billboard pour que la barre soit toujours visible
-	mesh_instance.top_level = false
-	
-	return mesh_instance
+	hp_bar_3d.set_surface_override_material(0, material)
+	hp_bar_3d.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	hp_bar_container.add_child(hp_bar_3d)
 
-func _create_team_indicator() -> MeshInstance3D:
-	"""Crée un petit cube indicateur d'équipe"""
-	var mesh_instance = MeshInstance3D.new()
+func _create_team_indicator_with_billboard() -> void:
+	"""Crée un indicateur d'équipe avec billboard"""
 	
+	# Container qui va faire le billboard
+	team_indicator_container = Node3D.new()
+	team_indicator_container.position = Vector3(tile_size * 0.35, sprite_height + 0.3, 0)
+	team_indicator_container.top_level = false
+	add_child(team_indicator_container)
+	
+	# Cube indicateur
+	team_indicator = MeshInstance3D.new()
 	var box = BoxMesh.new()
-	box.size = Vector3(0.15, 0.15, 0.15)
-	mesh_instance.mesh = box
-	
-	mesh_instance.position = Vector3(tile_size * 0.35, sprite_height + 0.3, 0)
+	box.size = Vector3(0.15, 0.15, 0.02)
+	team_indicator.mesh = box
 	
 	var material = StandardMaterial3D.new()
 	material.albedo_color = Color.GREEN if is_player_unit else Color.RED
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mesh_instance.set_surface_override_material(0, material)
+	material.emission_enabled = true
+	material.emission = material.albedo_color * 0.5
+	team_indicator.set_surface_override_material(0, material)
+	team_indicator.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	team_indicator_container.add_child(team_indicator)
+
+func _process(_delta: float) -> void:
+	"""Faire tourner les UI vers la caméra"""
+	# Trouver la caméra
+	var camera = get_viewport().get_camera_3d()
+	if not camera:
+		return
 	
-	return mesh_instance
+	# Faire tourner les containers UI vers la caméra (billboard manuel)
+	if hp_bar_container:
+		hp_bar_container.look_at(camera.global_position, Vector3.UP)
+	
+	if team_indicator_container:
+		team_indicator_container.look_at(camera.global_position, Vector3.UP)
 
 func _create_collision() -> void:
 	"""Crée une collision pour le raycasting"""
@@ -408,7 +458,6 @@ func _animate_death() -> void:
 # DONNÉES (identiques)
 # ============================================================================
 
-
 func get_unit_data() -> Dictionary:
 	return {
 		"id": unit_id,
@@ -478,7 +527,7 @@ func initialize_unit(data: Dictionary) -> void:
 	if data.has("range"):
 		attack_range = data.range
 	
-	# Capacités (avec conversion de type sécurisée)
+	# Capacités
 	if data.has("abilities"):
 		abilities.clear()
 		var abilities_array = data.abilities
