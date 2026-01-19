@@ -46,7 +46,7 @@ func _ready() -> void:
 # ENREGISTREMENT DES UNITÉS
 # ============================================================================
 
-func register_unit(unit: BattleUnit) -> void:
+func register_unit(unit: BattleUnit3D) -> void:
 	"""Enregistre une nouvelle unité pour le tracking"""
 	
 	unit_stats[unit.unit_id] = {
@@ -69,7 +69,7 @@ func register_unit(unit: BattleUnit) -> void:
 # ENREGISTREMENT DES ACTIONS
 # ============================================================================
 
-func record_movement(unit: BattleUnit, path: Array) -> void:
+func record_movement(unit: BattleUnit3D, path: Array) -> void:
 	"""Enregistre un déplacement"""
 	
 	if not unit_stats.has(unit.unit_id):
@@ -80,7 +80,7 @@ func record_movement(unit: BattleUnit, path: Array) -> void:
 	
 	stat_recorded.emit("movement", unit.unit_id)
 
-func record_action(attacker: BattleUnit, target: BattleUnit, action_type: String) -> void:
+func record_action(attacker: BattleUnit3D, target: BattleUnit3D, action_type: String) -> void:
 	"""Enregistre une action (attaque, capacité, etc.)"""
 	
 	if not unit_stats.has(attacker.unit_id):
@@ -95,7 +95,7 @@ func record_action(attacker: BattleUnit, target: BattleUnit, action_type: String
 	
 	stat_recorded.emit("action", attacker.unit_id)
 
-func record_damage(attacker: BattleUnit, target: BattleUnit, damage: int) -> void:
+func record_damage(attacker: BattleUnit3D, target: BattleUnit3D, damage: int) -> void:
 	"""Enregistre des dégâts infligés"""
 	
 	if unit_stats.has(attacker.unit_id):
@@ -110,7 +110,7 @@ func record_damage(attacker: BattleUnit, target: BattleUnit, damage: int) -> voi
 	
 	stat_recorded.emit("damage", damage)
 
-func record_healing(healer: BattleUnit, target: BattleUnit, amount: int) -> void:
+func record_healing(healer: BattleUnit3D, target: BattleUnit3D, amount: int) -> void:
 	"""Enregistre des soins"""
 	
 	if unit_stats.has(healer.unit_id):
@@ -122,7 +122,7 @@ func record_healing(healer: BattleUnit, target: BattleUnit, amount: int) -> void
 	
 	stat_recorded.emit("healing", amount)
 
-func record_kill(killer: BattleUnit, victim: BattleUnit) -> void:
+func record_kill(killer: BattleUnit3D, victim: BattleUnit3D) -> void:
 	"""Enregistre une élimination"""
 	
 	if unit_stats.has(killer.unit_id):
@@ -131,7 +131,7 @@ func record_kill(killer: BattleUnit, victim: BattleUnit) -> void:
 	
 	stat_recorded.emit("kill", killer.unit_id)
 
-func record_death(unit: BattleUnit) -> void:
+func record_death(unit: BattleUnit3D) -> void:
 	"""Enregistre la mort d'une unité"""
 	
 	if unit_stats.has(unit.unit_id):
@@ -236,10 +236,10 @@ func _calculate_unit_score(stats: Dictionary) -> float:
 # MVP
 # ============================================================================
 
-func get_mvp() -> BattleUnit:
+func get_mvp() -> BattleUnit3D:
 	"""Détermine le MVP du combat"""
 	
-	var best_unit: BattleUnit = null
+	var best_unit: BattleUnit3D = null
 	var best_score: float = -INF
 	
 	for unit_id in unit_stats:

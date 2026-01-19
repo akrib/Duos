@@ -94,7 +94,7 @@ func trigger_turn_event(turn: int, is_player: bool) -> void:
 	
 	triggered_events.append(trigger_id)
 
-func trigger_position_event(unit: BattleUnit, pos: Vector2i) -> void:
+func trigger_position_event(unit: BattleUnit3D, pos: Vector2i) -> void:
 	"""Déclenche les événements de position"""
 	
 	var pos_key = str(pos.x) + "," + str(pos.y)

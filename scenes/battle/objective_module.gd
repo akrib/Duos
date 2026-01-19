@@ -92,7 +92,7 @@ func _check_objective(obj_id: String, obj: Dictionary) -> void:
 			if not _check_unit_alive(obj.data.unit_id):
 				_fail_objective(obj_id)
 
-func check_position_objectives(unit: BattleUnit, pos: Vector2i) -> void:
+func check_position_objectives(unit: BattleUnit3D, pos: Vector2i) -> void:
 	"""Vérifie les objectifs basés sur la position"""
 	
 	for obj_id in objectives:

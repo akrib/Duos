@@ -1,6 +1,6 @@
-[gd_scene load_steps=2 format=3 uid="uid://bwl5muxjxg1q3"]
+[gd_scene load_steps=2 format=3 uid="uid://4bj7etivw784"]
 
-[ext_resource type="Script" path="res://scenes/battle/battle_map_manager_3d.gd" id="1_manager"]
+[ext_resource type="Script" uid="uid://cxlgc0ggknf3y" path="res://scenes/battle/battle_map_manager_3d.gd" id="1_manager"]
 
 [node name="BattleMap3D" type="Node3D"]
 script = ExtResource("1_manager")
@@ -10,7 +10,6 @@ script = ExtResource("1_manager")
 [node name="UnitsContainer" type="Node3D" parent="."]
 
 [node name="CameraRig" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 
 [node name="Camera3D" type="Camera3D" parent="CameraRig"]
 transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 15, 15)
