@@ -55,12 +55,22 @@ func load_scene(scene_path: String, transition: bool = true) -> void:
 	if transition:
 		await _fade_out()
 	
-	# Nettoyer l'ancienne scène
-	if current_scene != null:
-		_disconnect_scene_signals(current_scene)
-		current_scene.queue_free()
-		await current_scene.tree_exited
-		current_scene = null
+	# CORRECTION : Nettoyer TOUTES les scènes sauf les autoloads
+	var root = get_tree().root
+	for child in root.get_children():
+		# Ne pas supprimer les autoloads (EventBus, GameManager, etc.)
+		if child.name in ["EventBus", "GameManager"]:
+			continue
+		# Ne pas supprimer le SceneLoader lui-même
+		if child == self or child == transition_overlay:
+			continue
+		
+		print("[SceneLoader] Suppression de : ", child.name)
+		child.queue_free()
+	
+	# Attendre que tout soit bien supprimé
+	await get_tree().process_frame
+	current_scene = null
 	
 	# Charger la nouvelle scène
 	var new_scene = await _load_scene_async(scene_path)
@@ -120,6 +130,7 @@ func _load_scene_async(scene_path: String) -> Node:
 		
 		await get_tree().process_frame
 	return null
+
 ## Auto-détection et connexion des signaux
 func _auto_connect_signals(node: Node) -> void:
 	"""Détecte et connecte automatiquement les signaux d'une scène"""
