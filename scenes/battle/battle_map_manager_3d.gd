@@ -113,12 +113,28 @@ func initialize_battle(data: Dictionary) -> void:
 	
 	print("[BattleMapManager3D] Initialisation du combat 3D...")
 	
+	print("[BattleMapManager3D] 🔍 Début _initialize_battle avec data: ", data.keys())
+	
 	await _initialize_modules()
+	print("[BattleMapManager3D] ✅ Modules initialisés")
+	
 	await _load_terrain(data.get("terrain", "plains"))
+	print("[BattleMapManager3D] ✅ Terrain chargé")
+	
+	print("[BattleMapManager3D] 🔍 Chargement des objectifs: ", data.get("objectives", {}))
 	await _load_objectives(data.get("objectives", {}))
+	print("[BattleMapManager3D] ✅ Objectifs chargés")
+	
+	print("[BattleMapManager3D] 🔍 Chargement du scénario: ", data.get("scenario", {}))
 	await _load_scenario(data.get("scenario", {}))
+	print("[BattleMapManager3D] ✅ Scénario chargé")
+	
+	print("[BattleMapManager3D] 🔍 Spawn des unités - Joueur: ", data.get("player_units", []).size(), " Ennemi: ", data.get("enemy_units", []).size())
 	await _spawn_units(data.get("player_units", []), data.get("enemy_units", []))
+	print("[BattleMapManager3D] ✅ Unités spawned")
+	
 	await _start_battle()
+	print("[BattleMapManager3D] ✅ Combat démarré")
 	
 		# ✅ NOUVEAU : Nettoyer maintenant que tout est chargé
 	EventBus.clear_battle_data()
@@ -197,18 +213,30 @@ func _load_terrain(terrain_data: Variant) -> void:
 		terrain_module.load_preset(terrain_data)
 	elif typeof(terrain_data) == TYPE_DICTIONARY:
 		terrain_module.load_custom(terrain_data)
-	await terrain_module.generation_complete
+	#await terrain_module.generation_complete
 	print("[BattleMapManager3D] Terrain 3D chargé")
 
 func _load_objectives(objectives_data: Dictionary) -> void:
+	print("[BattleMapManager3D] 📋 _load_objectives appelé avec: ", objectives_data)
+	if objectives_data.is_empty():
+		print("[BattleMapManager3D] ⚠️ Aucun objectif fourni")
+		return	
 	objective_module.setup_objectives(objectives_data)
 	await get_tree().process_frame
 
 func _load_scenario(scenario_data: Dictionary) -> void:
+	print("[BattleMapManager3D] 📜 _load_scenario appelé avec: ", scenario_data)
+	if scenario_data.is_empty():
+		print("[BattleMapManager3D] ⚠️ Aucun scénario fourni")
+		return
 	scenario_module.setup_scenario(scenario_data)
 	await get_tree().process_frame
 
 func _spawn_units(player_units: Array, enemy_units: Array) -> void:
+	print("[BattleMapManager3D] 👥 _spawn_units appelé - Joueur: ", player_units.size(), " Ennemi: ", enemy_units.size())
+	if player_units.is_empty() and enemy_units.is_empty():
+		print("[BattleMapManager3D] ⚠️ Aucune unité à spawner !")
+		return
 	for unit_data in player_units:
 		var unit = unit_manager.spawn_unit(unit_data, true)
 		if unit:

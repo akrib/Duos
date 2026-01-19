@@ -408,6 +408,7 @@ func _animate_death() -> void:
 # DONNÉES (identiques)
 # ============================================================================
 
+
 func get_unit_data() -> Dictionary:
 	return {
 		"id": unit_id,
