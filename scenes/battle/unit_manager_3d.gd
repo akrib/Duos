@@ -34,6 +34,12 @@ var unit_grid: Dictionary = {}  # Vector2i -> BattleUnit3D
 func spawn_unit(unit_data: Dictionary, is_player: bool) -> BattleUnit3D:
 	"""Spawne une unité 3D sur le terrain"""
 	
+		# === DÉBUT DEBUG ===
+	print("\n[UnitManager3D] 🎯 Spawning unit: ", unit_data.get("name", "UNKNOWN"))
+	print("  - is_player: ", is_player)
+	print("  - grid_position from data: ", unit_data.get("position", Vector2i(-1, -1)))
+	# === FIN DEBUG ===
+	
 	var unit = BattleUnit3D.new()
 	
 	# Configuration
@@ -175,10 +181,16 @@ func clear_all_units() -> void:
 # ============================================================================
 
 func _grid_to_world_3d(grid_pos: Vector2i) -> Vector3:
-	"""Convertit une position grille en position monde 3D"""
+	"""Convertit une position grille en position monde 3D avec hauteur du terrain"""
 	if terrain:
 		var world_2d = terrain.grid_to_world(grid_pos)
-		return Vector3(world_2d.x, 0, world_2d.y)
+		
+		# CORRECTION : Obtenir la hauteur du terrain
+		var tile_type = terrain.get_tile_type(grid_pos)
+		var tile_height = terrain.TILE_HEIGHTS.get(tile_type, 0.0)
+		
+		# Ajouter 0.5 pour que l'unité soit AU-DESSUS du sol
+		return Vector3(world_2d.x, tile_height + 0.5, world_2d.y)
 	
 	# Fallback si pas de terrain
 	var offset_x = (20 - 1) * tile_size / 2.0

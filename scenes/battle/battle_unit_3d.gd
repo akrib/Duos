@@ -87,7 +87,7 @@ func _create_visuals_3d() -> void:
 	shadow_sprite = Sprite3D.new()
 	shadow_sprite.billboard = BaseMaterial3D.BILLBOARD_DISABLED
 	shadow_sprite.texture = _create_circle_texture(64, Color(0, 0, 0, 0.3))
-	shadow_sprite.pixel_size = 0.01
+	shadow_sprite.pixel_size = 0.02
 	shadow_sprite.rotation.x = -PI / 2  # Horizontal
 	shadow_sprite.position.y = 0.05
 	add_child(shadow_sprite)
@@ -96,7 +96,7 @@ func _create_visuals_3d() -> void:
 	sprite_3d = Sprite3D.new()
 	sprite_3d.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	sprite_3d.texture = _create_unit_texture()
-	sprite_3d.pixel_size = 0.005
+	sprite_3d.pixel_size = 0.01
 	sprite_3d.position.y = sprite_height
 	add_child(sprite_3d)
 	
@@ -115,6 +115,17 @@ func _create_visuals_3d() -> void:
 	
 	# 6. COLLISION POUR LE RAYCASTING
 	_create_collision()
+# Forcer la visibilité de tous les éléments
+	visible = true
+	show()
+	
+	for child in get_children():
+		if child is VisualInstance3D:
+			child.visible = true
+			child.show()
+	
+	print("[BattleUnit3D] 👁️ Visuals created for ", unit_name)
+	print("  - Children: ", get_child_count())
 
 func _create_unit_texture() -> ImageTexture:
 	"""Crée une texture simple pour le sprite de l'unité"""
