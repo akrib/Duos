@@ -182,8 +182,10 @@ func _create_selection_ring() -> MeshInstance3D:
 	
 	# ✅ CORRECTION : Rotation pour mettre l'anneau horizontal au sol
 	# Le TorusMesh est vertical par défaut (axe Y), on le tourne de -90° sur X
-	mesh_instance.rotation_degrees.x = -90  # Horizontal au sol
-	mesh_instance.position.y = 0.08  # Légèrement au-dessus du sol
+	#mesh_instance.rotation_degrees.x = -90  # Horizontal au sol
+	mesh_instance.rotation_degrees.y = -90  # Horizontal au sol
+	#mesh_instance.rotation_degrees.z = -90  # Horizontal au sol
+	mesh_instance.position.y = -0.4 # Légèrement au-dessus du sol
 	
 	# Matériau émissif jaune
 	var material = StandardMaterial3D.new()

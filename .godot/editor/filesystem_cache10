@@ -1,5 +1,5 @@
 63f7b34db8d8cdea90c76aacccf841ec
-::res://::1768842584
+::res://::1768857728
 icon.svg::CompressedTexture2D::5951942856466079911::1768780357::1768780397::1::::<><><>0<>0<>5f7c4dbe587a3f9ad449c81845b29b02<>res://.godot/imported/icon.svg-218a8f2b3041327d8a5756f3a245f83b.ctex::
 ::res://documentation/::1768780357
 DIAGRAMMES.md::TextFile::-1::1768780357::0::1::::<><><>0<>0<><>::
@@ -8,14 +8,14 @@ GUIDE_UTILISATION.md::TextFile::-1::1768780357::0::1::::<><><>0<>0<><>::
 QUICKSTART.md::TextFile::-1::1768780357::0::1::::<><><>0<>0<><>::
 README.md::TextFile::-1::1768780357::0::1::::<><><>0<>0<><>::
 ::res://scenes/::1768780357
-::res://scenes/battle/::1768839911
+::res://scenes/battle/::1768857713
 action_module_3d.gd::GDScript::4481846147743693832::1768828272::0::1::::ActionModule3D<>Node<><>0<>0<><>::
 ai_module_3d.gd::GDScript::1731435130414596665::1768828272::0::1::::AIModule3D<>Node<><>0<>0<><>::
-battle_3d.tscn::PackedScene::2038144681433987519::1768842503::0::1::::<><><>0<>0<><>::uid://cxlgc0ggknf3y::::res://scenes/battle/battle_map_manager_3d.gd
+battle_3d.tscn::PackedScene::2038144681433987519::1768857713::0::1::::<><><>0<>0<><>::uid://cxlgc0ggknf3y::::res://scenes/battle/battle_map_manager_3d.gd
 battle_map_manager_3d.gd::GDScript::6410262122539086764::1768842504::0::1::::BattleMapManager3D<>Node3D<><>0<>0<><>::
 battle_stats_tracker.gd::GDScript::852914710640604978::1768832477::0::1::::BattleStatsTracker<>Node<><>0<>0<><>::
-battle_unit_3d.gd::GDScript::8609719725604936486::1768839804::0::1::::BattleUnit3D<>Node3D<><>0<>0<><>::
-duo_system_module.gd::GDScript::8247124520807586293::1768780357::0::1::::DuoSystemModule<>Node<><>0<>0<><>::
+battle_unit_3d.gd::GDScript::8609719725604936486::1768857713::0::1::::BattleUnit3D<>Node3D<><>0<>0<><>::
+duo_system_module.gd::GDScript::8247124520807586293::1768842640::0::1::::DuoSystemModule<>Node<><>0<>0<><>::
 example_battle_scene.gd::GDScript::7975613586184551254::1768780357::0::1::::BattleScene<>Node2D<><>0<>0<><>::
 GUIDE_INTEGRATION_3D.md::TextFile::-1::1768828272::0::1::::<><><>0<>0<><>::
 movement_module_3d.gd::GDScript::7824548419929014470::1768828272::0::1::::MovementModule3D<>Node<><>0<>0<><>::
