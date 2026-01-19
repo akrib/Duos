@@ -1,17 +1,26 @@
-[gd_scene load_steps=2 format=3 uid="uid://pksihtgf4die"]
+[gd_scene load_steps=2 format=3 uid="uid://bwl5muxjxg1q3"]
 
-[ext_resource type="Script" uid="uid://1xwowixdhteg" path="res://scenes/battle/battle_map_manager.gd" id="1_6cni1"]
+[ext_resource type="Script" path="res://scenes/battle/battle_map_manager_3d.gd" id="1_manager"]
 
-[node name="BattleMap" type="Node2D"]
-script = ExtResource("1_6cni1")
+[node name="BattleMap3D" type="Node3D"]
+script = ExtResource("1_manager")
 
-[node name="GridContainer" type="Node2D" parent="."]
-position = Vector2(0, 81)
+[node name="GridContainer" type="Node3D" parent="."]
 
-[node name="UnitsContainer" type="Node2D" parent="."]
+[node name="UnitsContainer" type="Node3D" parent="."]
 
-[node name="Camera2D" type="Camera2D" parent="."]
-position = Vector2(960, 540)
+[node name="CameraRig" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="Camera3D" type="Camera3D" parent="CameraRig"]
+transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 15, 15)
+fov = 50.0
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866025, -0.433013, 0.25, 0, 0.5, 0.866025, -0.5, -0.75, 0.433013, 0, 10, 0)
+shadow_enabled = true
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 
 [node name="UILayer" type="CanvasLayer" parent="."]
 
@@ -55,6 +64,11 @@ text = "Tour 1"
 layout_mode = 2
 theme_override_font_sizes/font_size = 24
 text = "Phase: Joueur"
+
+[node name="CameraHint" type="Label" parent="UILayer/BattleUI/TopBar/MarginContainer/HBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "A/E: Rotation"
 
 [node name="BottomBar" type="PanelContainer" parent="UILayer/BattleUI"]
 layout_mode = 1

@@ -45,7 +45,7 @@ const SCENE_PATHS: Dictionary = {
 	SceneID.CASTLE: "res://scenes/world/castle.tscn",
 	
 	# Combat
-	SceneID.BATTLE: "res://scenes/battle/battle.tscn",
+	SceneID.BATTLE: "res://scenes/battle/battle_3d.tscn",
 	SceneID.BATTLE_PREPARATION: "res://scenes/battle/battle_preparation.tscn",
 	SceneID.BATTLE_RESULTS: "res://scenes/battle/battle_results.tscn",
 	
