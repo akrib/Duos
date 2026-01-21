@@ -72,6 +72,9 @@ enum ActionState {
 # Boutons de contrôle
 @onready var end_turn_button: Button = $UILayer/BattleUI/BottomBar/MarginContainer/HBoxContainer/ButtonsContainer/EndTurnButton
 
+# dialogue
+@onready var dialogue_box: DialogueBox = $UILayer/DialogueBox
+
 # ============================================================================
 # MODULES
 # ============================================================================
@@ -131,6 +134,10 @@ func _ready() -> void:
 	_setup_camera()
 	_connect_ui_buttons()
 	_connect_to_event_bus()
+	#var dialogue_scene = load("res://scenes/ui/dialogue_box.tscn")
+	#dialogue_box = dialogue_scene.instantiate()
+	#$UILayer.add_child(dialogue_box)
+	
 	print("[BattleMapManager3D] Initialisé")
 
 func _setup_camera() -> void:
@@ -338,17 +345,40 @@ func _process(delta: float) -> void:
 
 func _process_camera_rotation(delta: float) -> void:
 	if is_camera_rotating:
+		# Calculer la différence d'angle en prenant le chemin le plus court
 		var angle_diff = camera_rotation_target - camera_rotation_current
 		
+		# ✅ CORRECTION : Normaliser pour prendre le chemin le plus court
+		# Ramener angle_diff entre -180 et 180
+		while angle_diff > 180:
+			angle_diff -= 360
+		while angle_diff < -180:
+			angle_diff += 360
+		
+		# Vérifier si on est arrivé à la cible
 		if abs(angle_diff) < 0.1:
 			camera_rotation_current = camera_rotation_target
 			is_camera_rotating = false
 		else:
 			var rotation_step = CAMERA_ROTATION_SPEED * delta
-			if angle_diff < 0:
-				rotation_step = -rotation_step
 			
-			camera_rotation_current += rotation_step
+			# ✅ CORRECTION : Limiter le pas pour ne pas dépasser la cible
+			if abs(angle_diff) < rotation_step:
+				camera_rotation_current = camera_rotation_target
+				is_camera_rotating = false
+			else:
+				# Tourner dans la bonne direction (selon le signe de angle_diff)
+				if angle_diff > 0:
+					camera_rotation_current += rotation_step
+				else:
+					camera_rotation_current -= rotation_step
+			
+			# ✅ CORRECTION : Normaliser camera_rotation_current entre 0 et 360
+			while camera_rotation_current >= 360:
+				camera_rotation_current -= 360
+			while camera_rotation_current < 0:
+				camera_rotation_current += 360
+			
 			_update_camera_position()
 
 func _update_camera_position() -> void:

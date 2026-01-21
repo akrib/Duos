@@ -22,6 +22,10 @@ class_name WorldMap
 @onready var town2_button: Button = $InteractionButtons/Town2Button
 @onready var battle_button: Button = $InteractionButtons/BattleButton
 
+#dialogue 
+@onready var dialogue_box: DialogueBox = $UI/DialogueBox
+
+
 # État
 var camera_velocity: Vector2 = Vector2.ZERO
 var camera_drag_start: Vector2 = Vector2.ZERO
@@ -50,8 +54,19 @@ func _ready() -> void:
 	# Message de bienvenue
 	show_notification("Bienvenue sur la carte du monde !", 3.0)
 	
+	#var dialogue_scene = load("res://scenes/ui/dialogue_box.tscn")
+	#dialogue_box = dialogue_scene.instantiate()
+	#$UI.add_child(dialogue_box)
+	
 	print("[WorldMap] Carte du monde initialisée")
-
+	var test = DialogueData.quick_dialogue("test", [
+		["System", "Dialogue system is working!"],
+		["System", "[shake]Effects work too![/shake]"],
+		["System", "[rainbow]Colors are beautiful![/rainbow]"]
+	])
+	
+	# Démarrer
+	Dialogue_Manager.start_dialogue(test, dialogue_box)
 
 ## Auto-connexion des signaux via SceneLoader
 func _get_signal_connections() -> Array:

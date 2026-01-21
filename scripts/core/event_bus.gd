@@ -61,6 +61,11 @@ signal notification_posted(message: String, type: String)
 signal tooltip_requested(content: String, position: Vector2)
 signal tooltip_hidden()
 
+# --- Dialogue ---
+signal dialogue_bark_requested(speaker: String, text_key: String, position: Vector2)
+signal dialogue_typewriter_completed()
+signal dialogue_skip_requested()
+
 # ============================================================================
 # FILE D'ATTENTE POUR DONNÉES PERSISTANTES
 # ============================================================================
@@ -68,6 +73,8 @@ signal tooltip_hidden()
 # Certains événements nécessitent que les données survivent au changement de scène
 var _pending_battle_data: Dictionary = {}
 var _battle_data_ready: bool = false
+
+
 
 # ============================================================================
 # MÉTHODES UTILITAIRES
@@ -209,3 +216,7 @@ func debug_list_connections() -> void:
 		print("\n⚠️  Données de combat en attente (battle_id: ", _pending_battle_data.get("battle_id", "N/A"), ")")
 	
 	print("\n=====================================\n")
+	
+	# Helper methods
+func show_bark(speaker: String, text_key: String, position: Vector2) -> void:
+	dialogue_bark_requested.emit(speaker, text_key, position)
