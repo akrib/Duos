@@ -55,16 +55,19 @@ func load_scene(scene_path: String, transition: bool = true) -> void:
 	if transition:
 		await _fade_out()
 	
-	# CORRECTION : Nettoyer TOUTES les scènes sauf les autoloads
+# CORRECTION : Nettoyer TOUTES les scènes sauf les autoloads
 	var root = get_tree().root
 	for child in root.get_children():
-		# Ne pas supprimer les autoloads (EventBus, GameManager, etc.)
-		if child.name in ["EventBus", "GameManager"]:
-			continue
-		# Ne pas supprimer le SceneLoader lui-même
+		# Ne pas supprimer le SceneLoader lui-même et son overlay
 		if child == self or child == transition_overlay:
 			continue
-		
+
+		# ✅ MEILLEURE MÉTHODE: Vérifier si c'est un autoload
+		# Les autoloads sont dans les 10 premiers enfants de root
+		var child_index = child.get_index()
+		if child_index < 10 and child.name in ["EventBus", "GameManager", "Dialogue_Manager"]:
+			continue
+
 		print("[SceneLoader] Suppression de : ", child.name)
 		child.queue_free()
 	
