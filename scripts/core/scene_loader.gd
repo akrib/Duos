@@ -65,7 +65,7 @@ func load_scene(scene_path: String, transition: bool = true) -> void:
 		# ✅ MEILLEURE MÉTHODE: Vérifier si c'est un autoload
 		# Les autoloads sont dans les 10 premiers enfants de root
 		var child_index = child.get_index()
-		if child_index < 10 and child.name in ["EventBus", "GameManager", "Dialogue_Manager"]:
+		if child_index < 10 and child.name in ["EventBus", "GameManager", "Dialogue_Manager", "LuaManager"]:
 			continue
 
 		print("[SceneLoader] Suppression de : ", child.name)

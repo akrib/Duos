@@ -66,6 +66,11 @@ signal dialogue_bark_requested(speaker: String, text_key: String, position: Vect
 signal dialogue_typewriter_completed()
 signal dialogue_skip_requested()
 
+
+signal campaign_started()
+signal campaign_completed()
+signal chapter_changed(chapter_id: int)
+
 # ============================================================================
 # FILE D'ATTENTE POUR DONNÉES PERSISTANTES
 # ============================================================================

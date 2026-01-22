@@ -1,6 +1,7 @@
 # scripts/core/campaign_manager.gd
 extends Node
 ## CampaignManager - Gère la progression de la campagne Lua
+class_name CampaignManager
 
 signal campaign_started()
 signal chapter_changed(chapter_id: int)
