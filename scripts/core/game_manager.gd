@@ -5,6 +5,24 @@ extends Node
 var scene_loader: SceneLoader
 var current_scene_id: int = -1
 var game_state: Dictionary = {}
+var campaign_manager: CampaignManager
+
+
+func _on_game_started() -> void:
+	"""Callback quand une nouvelle partie démarre"""
+	print("[GameManager] Nouvelle partie - Lancement de la campagne")
+	
+	# Charger la carte du monde d'abord
+	load_scene_by_id(SceneRegistry.SceneID.WORLD_MAP, true)
+	
+	# Attendre que la scène soit chargée, puis lancer la campagne
+	await get_tree().create_timer(1.0).timeout
+	campaign_manager.start_new_campaign()
+
+func _on_campaign_started() -> void:
+	"""Callback quand la campagne démarre"""
+	print("[GameManager] Campagne démarrée")
+
 
 func _ready() -> void:
 	# Initialiser le SceneLoader
@@ -17,7 +35,8 @@ func _ready() -> void:
 	
 	# Connecter les événements
 	_setup_event_connections()
-	
+	campaign_manager = CampaignManager.new()
+	add_child(campaign_manager)
 	# Charger la scène initiale
 	call_deferred("_load_initial_scene")
 	
@@ -29,6 +48,8 @@ func _setup_event_connections() -> void:
 	EventBus.safe_connect("return_to_menu_requested", _on_return_to_menu_requested)
 	EventBus.safe_connect("quit_game_requested", _on_quit_game_requested)
 	EventBus.safe_connect("game_paused", _on_game_paused)
+	EventBus.safe_connect("game_started", _on_game_started)
+	EventBus.safe_connect("campaign_started", _on_campaign_started)
 
 func _load_initial_scene() -> void:
 	"""Charge la scène initiale (menu principal)"""
