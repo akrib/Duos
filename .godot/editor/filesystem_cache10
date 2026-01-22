@@ -1,6 +1,13 @@
 63f7b34db8d8cdea90c76aacccf841ec
-::res://::1769107436
+::res://::1769111019
 icon.svg::CompressedTexture2D::7093665754155309580::1768911536::1768915858::1::::<><><>0<>0<>1fca6a6c827ada54f939538ade83ea7a<>res://.godot/imported/icon.svg-218a8f2b3041327d8a5756f3a245f83b.ctex::
+::res://addons/::1769110881
+::res://addons/luaAPI/::1769110881
+luaAPI.gdextension::GDExtension::8208578819148945520::1769110881::0::1::::<><><>0<>0<><>::
+README.md::TextFile::-1::1769110881::0::1::::<><><>0<>0<><>::
+::res://demo/::1769110881
+HelloLua.gd::GDScript::4479699056248507272::1769110881::0::1::::<>Node<><>0<>0<><>::
+HelloLua.tscn::PackedScene::937316930337546741::1769110881::0::1::::<><><>0<>0<><>::res://demo/HelloLua.gd
 ::res://localization/::1768983024
 dialogues.csv::Translation::8465023859381499281::1768911750::1768983024::1::::<><><>0<>0<>71ae460bf05b4c12beae193de26cf8be<>res://localization/dialogues.en.translation<*>res://localization/dialogues.fr.translation<*>res://localization/dialogues.es.translation::
 dialogues.en.translation::OptimizedTranslation::7495354548441112579::1768983024::0::1::::<><><>0<>0<><>::
