@@ -1,6 +1,6 @@
 extends Node3D
 ## BattleMapManager3D - Gestionnaire principal du combat en 3D
-## Version avec menu d'actions et système de duo
+## VERSION CORRIGÉE : Meilleur timing de chargement et système de dialogue intégré
 
 class_name BattleMapManager3D
 
@@ -133,12 +133,20 @@ var mouse_ray_length: float = 1000.0
 func _ready() -> void:
 	_setup_camera()
 	_connect_ui_buttons()
-	_connect_to_event_bus()
-	#var dialogue_scene = load("res://scenes/ui/dialogue_box.tscn")
-	#dialogue_box = dialogue_scene.instantiate()
-	#$UILayer.add_child(dialogue_box)
 	
-	print("[BattleMapManager3D] Initialisé")
+	# ✅ CORRECTION : Vérifier les données en attente APRÈS que la scène soit prête
+	print("[BattleMapManager3D] Initialisé, vérification des données en attente...")
+	
+	# Attendre un frame pour être sûr que tout est chargé
+	await get_tree().process_frame
+	
+	# Vérifier si des données de combat sont en attente
+	var pending_data = EventBus.get_pending_battle_data()
+	if not pending_data.is_empty():
+		print("[BattleMapManager3D] ✅ Données de combat récupérées")
+		call_deferred("initialize_battle", pending_data)
+	else:
+		print("[BattleMapManager3D] ⚠️ Aucune donnée de combat en attente")
 
 func _setup_camera() -> void:
 	camera_rig.position = Vector3.ZERO
@@ -172,18 +180,25 @@ func initialize_battle(data: Dictionary) -> void:
 	battle_data = data
 	is_battle_active = true
 	
-	print("[BattleMapManager3D] Initialisation du combat 3D...")
+	print("[BattleMapManager3D] ⚔️ Initialisation du combat 3D...")
 	
 	await _initialize_modules()
+	
+	# ✅ CORRECTION : Passer la DialogueBox au scenario_module
+	if scenario_module and dialogue_box:
+		scenario_module.dialogue_box = dialogue_box
+		print("[BattleMapManager3D] DialogueBox configurée pour le scenario_module")
+	
 	await _load_terrain(data.get("terrain", "plains"))
 	await _load_objectives(data.get("objectives", {}))
 	await _load_scenario(data.get("scenario", {}))
 	await _spawn_units(data.get("player_units", []), data.get("enemy_units", []))
 	await _start_battle()
 	
+	# ✅ IMPORTANT : Nettoyer les données après utilisation
 	EventBus.clear_battle_data()
 	
-	print("[BattleMapManager3D] Combat prêt !")
+	print("[BattleMapManager3D] ✅ Combat prêt !")
 	battle_map_ready.emit()
 
 # ============================================================================
@@ -282,9 +297,14 @@ func _spawn_units(player_units: Array, enemy_units: Array) -> void:
 # ============================================================================
 
 func _start_battle() -> void:
+	# ✅ CORRECTION : S'assurer que la scène est complètement chargée
+	print("[BattleMapManager3D] 🎬 Démarrage du combat...")
+	
 	if scenario_module.has_intro():
 		change_phase(TurnPhase.CUTSCENE)
+		print("[BattleMapManager3D] Lancement de l'intro...")
 		await scenario_module.play_intro()
+		print("[BattleMapManager3D] Intro terminée")
 	
 	EventBus.battle_started.emit(battle_data)
 	change_phase(TurnPhase.PLAYER_TURN)
@@ -776,17 +796,6 @@ func _calculate_rewards(victory: bool, stats: Dictionary) -> Dictionary:
 		"gold": int(base_gold * efficiency_bonus),
 		"exp": int(base_exp * efficiency_bonus)
 	}
-
-# ============================================================================
-# EVENTBUS
-# ============================================================================
-
-func _connect_to_event_bus() -> void:
-	EventBus.safe_connect("battle_started", _on_eventbus_battle_started)
-
-func _on_eventbus_battle_started(data: Dictionary) -> void:
-	if not is_battle_active and data.has("battle_id"):
-		initialize_battle(data)
 
 # ============================================================================
 # NETTOYAGE

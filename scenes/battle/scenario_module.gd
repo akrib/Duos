@@ -1,5 +1,6 @@
 extends Node
 ## ScenarioModule - Gère les dialogues, événements scriptés, cutscenes
+## VERSION CORRIGÉE : Utilise le vrai système de dialogue
 
 class_name ScenarioModule
 
@@ -18,6 +19,9 @@ signal event_triggered(event_id: String)
 var scenario_data: Dictionary = {}
 var triggers: Dictionary = {}
 var triggered_events: Array[String] = []
+
+# ✅ NOUVEAU : Référence à la DialogueBox
+var dialogue_box: DialogueBox = null
 
 # ============================================================================
 # SETUP
@@ -55,7 +59,8 @@ func play_intro() -> void:
 	"""Joue la cutscene d'intro"""
 	
 	if scenario_data.has("intro_dialogue"):
-		await _play_dialogue(scenario_data.intro_dialogue)
+		# ✅ CORRECTION : Utiliser le vrai système de dialogue
+		await _play_dialogue_real(scenario_data.intro_dialogue)
 	
 	await get_tree().create_timer(0.5).timeout
 
@@ -70,9 +75,57 @@ func play_outro(victory: bool) -> void:
 	var dialogue_key = "outro_victory" if victory else "outro_defeat"
 	
 	if scenario_data.has(dialogue_key):
-		await _play_dialogue(scenario_data[dialogue_key])
+		# ✅ CORRECTION : Utiliser le vrai système de dialogue
+		await _play_dialogue_real(scenario_data[dialogue_key])
 	
 	await get_tree().create_timer(0.5).timeout
+
+# ============================================================================
+# SYSTÈME DE DIALOGUE RÉEL
+# ============================================================================
+
+func _play_dialogue_real(dialogue_lines: Array) -> void:
+	"""✅ NOUVEAU : Joue un dialogue avec le vrai système DialogueBox"""
+	
+	if not dialogue_box:
+		push_warning("[ScenarioModule] DialogueBox non configurée, fallback vers ancien système")
+		await _play_dialogue_fallback(dialogue_lines)
+		return
+	
+	# Créer un DialogueData à partir des lignes
+	var dialogue_data = DialogueData.new("scenario_dialogue_" + str(Time.get_ticks_msec()))
+	
+	for line in dialogue_lines:
+		var speaker = line.get("speaker", "???")
+		var text = line.get("text", "")
+		
+		dialogue_data.add_line(speaker, text)
+	
+	# Démarrer le dialogue
+	Dialogue_Manager.start_dialogue(dialogue_data, dialogue_box)
+	
+	# Attendre que le dialogue se termine
+	await Dialogue_Manager.dialogue_ended
+
+# ============================================================================
+# FALLBACK (ancien système pour compatibilité)
+# ============================================================================
+
+func _play_dialogue_fallback(dialogue_lines: Array) -> void:
+	"""Système de dialogue simple (fallback)"""
+	
+	dialogue_started.emit("dialogue")
+	
+	for line in dialogue_lines:
+		var speaker = line.get("speaker", "???")
+		var text = line.get("text", "")
+		
+		print("[", speaker, "] ", text)
+		EventBus.notify(speaker + ": " + text, "info")
+		
+		await get_tree().create_timer(2.0).timeout
+	
+	dialogue_ended.emit("dialogue")
 
 # ============================================================================
 # TRIGGERS
@@ -132,22 +185,6 @@ func _execute_event(event_data: Dictionary, event_id: String) -> void:
 		
 		_:
 			print("[ScenarioModule] Événement inconnu: ", event_data)
-
-func _play_dialogue(dialogue_lines: Array) -> void:
-	"""Joue un dialogue"""
-	
-	dialogue_started.emit("dialogue")
-	
-	for line in dialogue_lines:
-		var speaker = line.get("speaker", "???")
-		var text = line.get("text", "")
-		
-		print("[", speaker, "] ", text)
-		EventBus.notify(speaker + ": " + text, "info")
-		
-		await get_tree().create_timer(2.0).timeout
-	
-	dialogue_ended.emit("dialogue")
 
 func _play_dialogue_text(text: String) -> void:
 	"""Joue un texte simple"""

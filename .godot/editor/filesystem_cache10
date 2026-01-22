@@ -1,5 +1,5 @@
 63f7b34db8d8cdea90c76aacccf841ec
-::res://::1769076586
+::res://::1769079524
 icon.svg::CompressedTexture2D::7093665754155309580::1768911536::1768915858::1::::<><><>0<>0<>1fca6a6c827ada54f939538ade83ea7a<>res://.godot/imported/icon.svg-218a8f2b3041327d8a5756f3a245f83b.ctex::
 ::res://localization/::1768983024
 dialogues.csv::Translation::8465023859381499281::1768911750::1768983024::1::::<><><>0<>0<>71ae460bf05b4c12beae193de26cf8be<>res://localization/dialogues.en.translation<*>res://localization/dialogues.fr.translation<*>res://localization/dialogues.es.translation::
@@ -11,13 +11,13 @@ dialogues.fr.translation::OptimizedTranslation::4426011764462439724::1768983024:
 action_module_3d.gd::GDScript::4481846147743693832::1768911536::0::1::::ActionModule3D<>Node<><>0<>0<><>::
 ai_module_3d.gd::GDScript::1731435130414596665::1768911536::0::1::::AIModule3D<>Node<><>0<>0<><>::
 battle_3d.tscn::PackedScene::2038144681433987519::1769076415::0::1::::<><><>0<>0<><>::uid://di4ee2clqc84g::::res://scenes/battle/battle_map_manager_3d.gd<>uid://byp8xytm75beo::::res://scenes/ui/dialogue_box.tscn
-battle_map_manager_3d.gd::GDScript::7780891187939332692::1768987669::0::1::::BattleMapManager3D<>Node3D<><>0<>0<><>::
+battle_map_manager_3d.gd::GDScript::7780891187939332692::1769075438::0::1::::BattleMapManager3D<>Node3D<><>0<>0<><>::
 battle_stats_tracker.gd::GDScript::7946495717862546440::1768911536::0::1::::BattleStatsTracker<>Node<><>0<>0<><>::
 battle_unit_3d.gd::GDScript::108167463152905312::1768911536::0::1::::BattleUnit3D<>Node3D<><>0<>0<><>::
 duo_system_module.gd::GDScript::7601086557062413612::1768911536::0::1::::DuoSystemModule<>Node<><>0<>0<><>::
 movement_module_3d.gd::GDScript::7824548419929014470::1768911536::0::1::::MovementModule3D<>Node<><>0<>0<><>::
 objective_module.gd::GDScript::6637864561934450984::1768911536::0::1::::ObjectiveModule<>Node<><>0<>0<><>::
-scenario_module.gd::GDScript::408456323944618083::1768911536::0::1::::ScenarioModule<>Node<><>0<>0<><>::
+scenario_module.gd::GDScript::408456323944618083::1769075438::0::1::::ScenarioModule<>Node<><>0<>0<><>::
 terrain_module.gd::GDScript::8932742765676538246::1768911536::0::1::::TerrainModule<>Node2D<><>0<>0<><>::
 terrain_module_3d.gd::GDScript::3824261157590975766::1768911536::0::1::::TerrainModule3D<>Node3D<><>0<>0<><>::
 unit_manager_3d.gd::GDScript::965895522430325761::1768911536::0::1::::UnitManager3D<>Node3D<><>0<>0<><>::
