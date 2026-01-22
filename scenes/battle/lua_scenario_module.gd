@@ -30,11 +30,11 @@ func _discover_lua_functions() -> void:
 		"on_unit_attack",
 		"on_unit_death",
 		"check_victory_condition",
-        "check_defeat_condition"
+		"check_defeat_condition"
 	]
 	
 	for func_name in standard_functions:
-		if LuaManager.lua.function_exists(func_name):
+		if LuaManager.function_exists(func_name):
 			lua_functions[func_name] = true
 
 func play_intro() -> void:
@@ -66,3 +66,28 @@ func _execute_lua_event(event_data: Dictionary) -> void:
 		
 		_:
 			push_warning("[LuaScenarioModule] Type d'événement inconnu: ", event_data.type)
+
+func _play_lua_dialogue(dialogue_lines: Array) -> void:
+	"""Joue un dialogue provenant de Lua"""
+	
+	if not dialogue_box:
+		push_warning("[LuaScenarioModule] DialogueBox non configurée")
+		return
+	
+	# Créer un DialogueData à partir des lignes Lua
+	var dialogue_data = DialogueData.new("lua_dialogue_" + str(Time.get_ticks_msec()))
+	
+	for line in dialogue_lines:
+		if typeof(line) != TYPE_DICTIONARY:
+			continue
+		
+		var speaker = line.get("speaker", "")
+		var text = line.get("text", "")
+		
+		dialogue_data.add_line(speaker, text)
+	
+	# Démarrer le dialogue
+	Dialogue_Manager.start_dialogue(dialogue_data, dialogue_box)
+	
+	# Attendre que le dialogue se termine
+	await Dialogue_Manager.dialogue_ended
