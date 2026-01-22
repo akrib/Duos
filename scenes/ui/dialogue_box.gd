@@ -350,47 +350,52 @@ func _animate_continue_indicator() -> void:
 # INPUT
 # ============================================================================
 
-
 func _input(event: InputEvent) -> void:
+	"""Gestion simplifiée de l'input du dialogue"""
+	
+	# Vérifications de base
 	if not visible or not dialogue_manager or not dialogue_manager.is_active():
 		return
 	
-	# Navigation dans les choix
+	# ===== GESTION DES CHOIX =====
 	if choices_container.visible and not choice_buttons.is_empty():
 		if event.is_action_pressed("ui_up"):
 			selected_choice_index = (selected_choice_index - 1 + choice_buttons.size()) % choice_buttons.size()
 			choice_buttons[selected_choice_index].grab_focus()
 			get_viewport().set_input_as_handled()
+			return
 		
-		elif event.is_action_pressed("ui_down"):
+		if event.is_action_pressed("ui_down"):
 			selected_choice_index = (selected_choice_index + 1) % choice_buttons.size()
 			choice_buttons[selected_choice_index].grab_focus()
 			get_viewport().set_input_as_handled()
-		return  # ✅ Ne pas avancer si on est en mode choix
+			return
+		
+		# Ne pas gérer l'avancement si on affiche des choix
+		return
 	
-	# ✅ NOUVEAU: Gérer l'avancement avec diverses touches
+	# ===== GESTION DE L'AVANCEMENT =====
 	var should_advance = false
 	
-	# Clic gauche souris
-	if event is InputEventMouseButton:
-		if event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-			should_advance = true
+	# Clic gauche de la souris
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		should_advance = true
 	
-	# Touches clavier (Espace, Entrée, E pour "suivant")
-	elif event.is_action_pressed("ui_accept"):  # Espace ou Entrée
+	# Touches d'acceptation (Espace, Entrée)
+	if event.is_action_pressed("ui_accept"):
 		should_advance = true
 	
 	if should_advance:
-		# Si le texte est en train d'apparaître, le compléter d'abord
+		# Si le texte est en train de se révéler, le compléter immédiatement
 		if is_text_revealing:
+			print("[DialogueBox] ⏩ Complétion du texte")
 			complete_text()
 		# Sinon, avancer au dialogue suivant
 		else:
+			print("[DialogueBox] ➡️ Avancement demandé")
 			dialogue_manager.advance_dialogue()
 		
 		get_viewport().set_input_as_handled()
-
-
 
 # ============================================================================
 # NETTOYAGE

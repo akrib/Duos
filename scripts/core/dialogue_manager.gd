@@ -90,7 +90,7 @@ func start_dialogue(dialogue: DialogueData, dialogue_box_instance: DialogueBox =
 	current_line_index = 0
 	is_dialogue_active = true
 	
-	# Utiliser la DialogueBox fournie ou celle par défaut
+	# Utiliser la DialogueBox fournie
 	dialogue_box = dialogue_box_instance
 	
 	if not dialogue_box:
@@ -102,6 +102,10 @@ func start_dialogue(dialogue: DialogueData, dialogue_box_instance: DialogueBox =
 	dialogue_box.dialogue_manager = self
 	dialogue_box.show_dialogue_box()
 	
+	# ✅ NOUVEAU : Se connecter au signal de révélation du texte
+	if not dialogue_box.text_reveal_completed.is_connected(_on_text_reveal_completed):
+		dialogue_box.text_reveal_completed.connect(_on_text_reveal_completed)
+	
 	# Émettre les signaux
 	dialogue_started.emit(dialogue.dialogue_id)
 	EventBus.dialogue_started.emit(dialogue.dialogue_id)
@@ -109,8 +113,8 @@ func start_dialogue(dialogue: DialogueData, dialogue_box_instance: DialogueBox =
 	# Afficher la première ligne
 	show_current_line()
 	
-	print("[Dialogue_Manager] Dialogue démarré : ", dialogue.dialogue_id, " | auto_mode: ", auto_mode)
-
+	print("[Dialogue_Manager] ✅ Dialogue démarré : ", dialogue.dialogue_id)
+	
 func start_dialogue_from_id(dialogue_id: String, dialogue_box_instance: DialogueBox = null) -> void:
 	"""Démarre un dialogue à partir de son ID (depuis le registre ou fichier)"""
 	
@@ -134,12 +138,7 @@ func show_current_line() -> void:
 	
 	var line = current_dialogue.lines[current_line_index]
 	
-	# ✅ DEBUG
-	print("[Dialogue_Manager] Affichage ligne ", current_line_index + 1, "/", current_dialogue.lines.size())
-	print("  - Speaker: ", line.get("speaker", "???"))
-	print("  - Text: ", (line.get("text", "").substr(0, 50) if line.get("text", "").length() > 50 else line.get("text", "")))
-	print("  - auto_mode: ", auto_mode)
-	print("  - line.auto_advance: ", line.get("auto_advance", "NOT SET"))
+	print("[Dialogue_Manager] 📖 Ligne ", current_line_index + 1, "/", current_dialogue.lines.size())
 	
 	# Ajouter à l'historique
 	_add_to_history(line)
@@ -161,22 +160,8 @@ func show_current_line() -> void:
 	# Émettre le signal
 	dialogue_line_shown.emit(line)
 	
-	# ✅ CORRIGÉ: Auto-advance SEULEMENT si auto_mode est activé
-	# ET que la ligne n'a pas explicitement auto_advance: false
-	if auto_mode and line.get("auto_advance", true):
-		var calculated_delay = _calculate_reading_time(line)
-		
-		print("[Dialogue_Manager] ⏰ Auto-advance dans ", calculated_delay, " secondes")
-		
-		get_tree().create_timer(calculated_delay).timeout.connect(
-			func():
-				if is_dialogue_active and dialogue_box and not dialogue_box.is_text_revealing:
-					print("[Dialogue_Manager] ⏰ Auto-advance déclenché")
-					advance_dialogue()
-		)
-	else:
-		print("[Dialogue_Manager] ⏸️ Pas d'auto-advance (attente input utilisateur)")
-
+	# ✅ IMPORTANT : L'auto-advance sera géré APRÈS la révélation du texte
+	# Pour ça, on se connecte au signal text_reveal_completed de la DialogueBox
 # ============================================================================
 # CALCUL DU TEMPS DE LECTURE
 # ============================================================================
@@ -297,6 +282,10 @@ func end_dialogue() -> void:
 	var dialogue_id = current_dialogue.dialogue_id if current_dialogue else ""
 	
 	is_dialogue_active = false
+	
+	# ✅ Déconnecter les signaux
+	if dialogue_box and dialogue_box.text_reveal_completed.is_connected(_on_text_reveal_completed):
+		dialogue_box.text_reveal_completed.disconnect(_on_text_reveal_completed)
 	
 	if dialogue_box:
 		dialogue_box.hide_dialogue_box()
@@ -428,14 +417,45 @@ func _on_eventbus_dialogue_ended(dialogue_id: String) -> void:
 # Pas besoin de le faire ici aussi pour éviter les doubles avancements
 
 # Toutefois, on garde la possibilité de toggle l'auto-mode avec une touche
-func _input(event: InputEvent) -> void:
-	if not is_dialogue_active:
+#func _input(event: InputEvent) -> void:
+#	if not is_dialogue_active:
+#		return
+#	
+#	# Toggle auto avec Q (ui_text_toggle_auto)
+#	if event.is_action_pressed("ui_text_toggle_auto"):
+#		toggle_auto_mode()
+#		get_viewport().set_input_as_handled()
+
+# ============================================================================
+# GESTION DE L'AUTO-ADVANCE (après révélation du texte)
+# ============================================================================
+
+func _on_text_reveal_completed() -> void:
+	"""Appelé quand le texte est complètement révélé"""
+	
+	if not is_dialogue_active or not current_dialogue:
 		return
 	
-	# Toggle auto avec Q (ui_text_toggle_auto)
-	if event.is_action_pressed("ui_text_toggle_auto"):
-		toggle_auto_mode()
-		get_viewport().set_input_as_handled()
+	var line = current_dialogue.lines[current_line_index]
+	
+	# ✅ CORRECTION : Auto-advance UNIQUEMENT si :
+	# 1. Le mode auto est activé
+	# 2. La ligne n'a pas explicitement auto_advance: false
+	if auto_mode and line.get("auto_advance", true):
+		var delay = _calculate_reading_time(line)
+		
+		print("[Dialogue_Manager] ⏰ Auto-advance dans ", delay, "s")
+		
+		# Créer le timer MAINTENANT (après révélation du texte)
+		get_tree().create_timer(delay).timeout.connect(
+			func():
+				if is_dialogue_active and current_line_index < current_dialogue.lines.size():
+					print("[Dialogue_Manager] ⏰ Auto-advance!")
+					advance_dialogue()
+		)
+	else:
+		print("[Dialogue_Manager] ⏸️ Attente input utilisateur")
+
 
 # ============================================================================
 # NETTOYAGE
