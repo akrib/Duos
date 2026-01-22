@@ -83,8 +83,13 @@ theme_override_constants/separation = 10
 
 [node name="ContinueIndicator" type="Label" parent="DialoguePanel"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "▼"
+offset_left = 1320.0  # Ajustez selon votre layout
+offset_top = 160.0
+offset_right = 1380.0
+offset_bottom = 190.0
+theme_override_colors/font_color = Color(1, 1, 0.5, 1)  # Jaune doré
+theme_override_font_sizes/font_size = 24
+text = "▼ Appuyez" 
 horizontal_alignment = 2
 vertical_alignment = 2
 

@@ -25,6 +25,11 @@ signal bark_requested(speaker: String, text: String, position: Vector2)
 @export var enable_auto_mode: bool = true
 @export var dialogue_sfx_volume: float = 0.0  # dB
 
+# ✅ NOUVEAU: Configuration du temps de lecture
+@export var reading_speed_chars_per_second: float = 15.0  # Vitesse de lecture moyenne
+@export var minimum_reading_time: float = 1.5  # Temps minimum même pour textes courts
+@export var maximum_reading_time: float = 8.0  # Temps maximum pour textes longs
+
 # ============================================================================
 # ÉTAT
 # ============================================================================
@@ -118,6 +123,7 @@ func start_dialogue_from_id(dialogue_id: String, dialogue_box_instance: Dialogue
 # AFFICHAGE DES LIGNES
 # ============================================================================
 
+
 func show_current_line() -> void:
 	"""Affiche la ligne actuelle du dialogue"""
 	
@@ -147,10 +153,62 @@ func show_current_line() -> void:
 	# Émettre le signal
 	dialogue_line_shown.emit(line)
 	
-	# Auto-advance si configuré
+	# ✅ NOUVEAU: Auto-advance intelligent basé sur la longueur du texte
 	if auto_mode and line.get("auto_advance", true):
-		var delay = line.get("auto_delay", default_auto_advance_delay)
-		get_tree().create_timer(delay).timeout.connect(advance_dialogue)
+		var calculated_delay = _calculate_reading_time(line)
+		
+		if OS.is_debug_build():
+			print("[Dialogue_Manager] Auto-advance dans ", calculated_delay, " secondes")
+		
+		get_tree().create_timer(calculated_delay).timeout.connect(
+			func():
+				if is_dialogue_active and dialogue_box and not dialogue_box.is_text_revealing:
+					advance_dialogue()
+		)
+
+
+# ============================================================================
+# CALCUL DU TEMPS DE LECTURE
+# ============================================================================
+
+func _calculate_reading_time(line: Dictionary) -> float:
+	"""Calcule le temps de lecture optimal pour une ligne de dialogue"""
+	
+	# Si un délai personnalisé est spécifié, l'utiliser
+	if line.has("auto_delay"):
+		return line.auto_delay
+	
+	# Récupérer le texte
+	var text = line.get("text", "")
+	var text_key = line.get("text_key", "")
+	
+	if text_key:
+		text = tr(text_key)
+	
+	# Supprimer les balises BBCode pour compter les vrais caractères
+	var clean_text = _strip_bbcode(text)
+	var char_count = clean_text.length()
+	
+	# Temps de révélation du texte (typewriter)
+	var reveal_speed = line.get("speed", default_text_speed)
+	var reveal_time = char_count / reveal_speed
+	
+	# Temps de lecture basé sur le nombre de caractères
+	var reading_time = char_count / reading_speed_chars_per_second
+	
+	# Temps total = révélation + lecture
+	var total_time = reveal_time + reading_time
+	
+	# Appliquer les limites min/max
+	total_time = clamp(total_time, minimum_reading_time, maximum_reading_time)
+	
+	return total_time
+
+func _strip_bbcode(text: String) -> String:
+	"""Retire les balises BBCode pour obtenir le texte brut"""
+	var regex = RegEx.new()
+	regex.compile("\\[[\\/]?[^\\]]*\\]")
+	return regex.sub(text, "", true)
 
 func show_choices(choices: Array) -> void:
 	"""Affiche des choix au joueur"""

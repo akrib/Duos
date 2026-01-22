@@ -100,6 +100,9 @@ func display_line(line: Dictionary) -> void:
 	
 	current_line = line
 	
+	# ✅ Cacher l'indicateur au début
+	if continue_indicator:
+		continue_indicator.visible = false
 	# Nettoyer les choix précédents
 	_clear_choices()
 	
@@ -229,9 +232,17 @@ func _on_text_reveal_completed() -> void:
 	"""Callback quand le texte est entièrement révélé"""
 	
 	is_text_revealing = false
-	continue_indicator.visible = true
+	
+	# ✅ NOUVEAU: Afficher l'indicateur seulement quand le texte est complètement révélé
+	if continue_indicator:
+		continue_indicator.visible = true
+		# Petite animation pour attirer l'attention
+		continue_indicator.modulate.a = 0.0
+		var tween = create_tween()
+		tween.tween_property(continue_indicator, "modulate:a", 1.0, 0.3)
+	
 	text_reveal_completed.emit()
-
+	
 # ============================================================================
 # EFFETS BBCode
 # ============================================================================
@@ -339,6 +350,7 @@ func _animate_continue_indicator() -> void:
 # INPUT
 # ============================================================================
 
+
 func _input(event: InputEvent) -> void:
 	if not visible or not dialogue_manager or not dialogue_manager.is_active():
 		return
@@ -354,15 +366,31 @@ func _input(event: InputEvent) -> void:
 			selected_choice_index = (selected_choice_index + 1) % choice_buttons.size()
 			choice_buttons[selected_choice_index].grab_focus()
 			get_viewport().set_input_as_handled()
+		return  # ✅ Ne pas avancer si on est en mode choix
 	
-	# Avancer avec clic
+	# ✅ NOUVEAU: Gérer l'avancement avec diverses touches
+	var should_advance = false
+	
+	# Clic gauche souris
 	if event is InputEventMouseButton:
 		if event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-			if is_text_revealing:
-				complete_text()
-			else:
-				dialogue_manager.advance_dialogue()
-			get_viewport().set_input_as_handled()
+			should_advance = true
+	
+	# Touches clavier (Espace, Entrée, E pour "suivant")
+	elif event.is_action_pressed("ui_accept"):  # Espace ou Entrée
+		should_advance = true
+	
+	if should_advance:
+		# Si le texte est en train d'apparaître, le compléter d'abord
+		if is_text_revealing:
+			complete_text()
+		# Sinon, avancer au dialogue suivant
+		else:
+			dialogue_manager.advance_dialogue()
+		
+		get_viewport().set_input_as_handled()
+
+
 
 # ============================================================================
 # NETTOYAGE
