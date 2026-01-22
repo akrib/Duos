@@ -24,7 +24,7 @@ class_name WorldMap
 
 #dialogue 
 @onready var dialogue_box: DialogueBox = $UI/DialogueBox
-
+@onready var campaign_manager: CampaignManager = CampaignManager.new()
 
 # État
 var camera_velocity: Vector2 = Vector2.ZERO
@@ -53,20 +53,9 @@ func _ready() -> void:
 	
 	# Message de bienvenue
 	show_notification("Bienvenue sur la carte du monde !", 3.0)
+
+	print("[WorldMap] Carte du monde initialisée")
 	
-	#var dialogue_scene = load("res://scenes/ui/dialogue_box.tscn")
-	#dialogue_box = dialogue_scene.instantiate()
-	#$UI.add_child(dialogue_box)
-	
-	#print("[WorldMap] Carte du monde initialisée")
-	#var test = DialogueData.quick_dialogue("test", [
-		#["System", "Dialogue system is working!"],
-		#["System", "[shake]Effects work too![/shake]"],
-		#["System", "[rainbow]Colors are beautiful![/rainbow]"]
-	#])
-	#
-	## Démarrer
-	#Dialogue_Manager.start_dialogue(test, dialogue_box)
 
 ## Auto-connexion des signaux via SceneLoader
 func _get_signal_connections() -> Array:
@@ -219,206 +208,8 @@ func _on_town2_clicked() -> void:
 func _on_battle_clicked() -> void:
 	"""Clic sur la Zone de Combat"""
 	print("[WorldMap] ✅ Clic sur Zone de Combat détecté !")
-	_start_forest_battle()
+	campaign_manager.start_battle("forest_battle")
 
-func _start_forest_battle() -> void:
-	"""Lance le combat de la forêt"""
-	print("[WorldMap] Lancement du combat de la forêt...")
-	show_notification("Préparation du combat...", 2.0)
-	
-	# Préparer les données du combat
-	var battle_data = _create_forest_battle_data()
-	
-	# Notifier l'EventBus et charger la scène de combat
-	EventBus.start_battle(battle_data)
-	EventBus.change_scene(SceneRegistry.SceneID.BATTLE)
-
-func _create_forest_battle_data() -> Dictionary:
-	"""Crée les données pour un combat en forêt"""
-	
-	return {
-		# Identifiant unique
-		"battle_id": "forest_battle_" + str(Time.get_unix_time_from_system()),
-		
-		# Terrain (preset ou personnalisé)
-		"terrain": "forest",
-		
-		# Unités du joueur
-		"player_units": [
-			{
-				"name": "Sir Gaheris",
-				"position": Vector2i(3, 7),
-				"stats": {
-					"hp": 120,
-					"attack": 28,
-					"defense": 22,
-					"movement": 4,
-					"range": 1
-				},
-				"abilities": ["Shield Bash", "Defend"],
-				"color": Color(0.2, 0.3, 0.8)
-			},
-			{
-				"name": "Elara l'Archère",
-				"position": Vector2i(4, 6),
-				"stats": {
-					"hp": 85,
-					"attack": 22,
-					"defense": 12,
-					"movement": 5,
-					"range": 3
-				},
-				"abilities": ["Multi-Shot"],
-				"color": Color(0.2, 0.7, 0.3)
-			},
-			{
-				"name": "Père Aldric",
-				"position": Vector2i(2, 8),
-				"stats": {
-					"hp": 95,
-					"attack": 15,
-					"defense": 18,
-					"movement": 4,
-					"range": 2
-				},
-				"abilities": ["Heal"],
-				"color": Color(0.8, 0.8, 0.3)
-			}
-		],
-		
-		# Unités ennemies
-		"enemy_units": [
-			{
-				"name": "Chef Gobelin",
-				"position": Vector2i(15, 8),
-				"stats": {
-					"hp": 90,
-					"attack": 25,
-					"defense": 15,
-					"movement": 5,
-					"range": 1
-				},
-				"abilities": [],
-				"color": Color(0.9, 0.2, 0.2)
-			},
-			{
-				"name": "Gobelin Guerrier",
-				"position": Vector2i(16, 7),
-				"stats": {
-					"hp": 60,
-					"attack": 20,
-					"defense": 10,
-					"movement": 5,
-					"range": 1
-				},
-				"color": Color(0.7, 0.2, 0.2)
-			},
-			{
-				"name": "Gobelin Guerrier",
-				"position": Vector2i(16, 9),
-				"stats": {
-					"hp": 60,
-					"attack": 20,
-					"defense": 10,
-					"movement": 5,
-					"range": 1
-				},
-				"color": Color(0.7, 0.2, 0.2)
-			},
-			{
-				"name": "Gobelin Archer",
-				"position": Vector2i(18, 8),
-				"stats": {
-					"hp": 45,
-					"attack": 18,
-					"defense": 6,
-					"movement": 4,
-					"range": 3
-				},
-				"color": Color(0.8, 0.3, 0.2)
-			},
-			{
-				"name": "Shaman Gobelin",
-				"position": Vector2i(19, 7),
-				"stats": {
-					"hp": 55,
-					"attack": 22,
-					"defense": 8,
-					"movement": 4,
-					"range": 2
-				},
-				"abilities": ["Heal"],
-				"color": Color(0.6, 0.2, 0.6)
-			}
-		],
-		
-		# Objectifs
-		"objectives": {
-			"primary": [
-				{
-					"type": "defeat_all_enemies",
-					"description": "Éliminez tous les gobelins"
-				}
-			],
-			"secondary": [
-				{
-					"type": "survive_turns",
-					"turns": 10,
-					"description": "Survivez sans perdre d'unité"
-				}
-			]
-		},
-		
-		# Scénario
-		"scenario": {
-			# Dialogue d'introduction
-			"intro_dialogue": [
-				{"speaker": "Sir Gaheris", "text": "Une embuscade gobeline ! En formation !"},
-				{"speaker": "Elara", "text": "Leur chef est là-bas. Si on l'élimine, les autres fuiront !"},
-				{"speaker": "Père Aldric", "text": "Que la lumière nous protège. Je veillerai sur vous."}
-			],
-			
-			# Dialogue de victoire
-			"outro_victory": [
-				{"speaker": "Sir Gaheris", "text": "Victoire ! Bien joué, compagnons."},
-				{"speaker": "Elara", "text": "Leur camp ne devrait plus être loin."}
-			],
-			
-			# Dialogue de défaite
-			"outro_defeat": [
-				{"speaker": "Sir Gaheris", "text": "Retraite ! Nous reviendrons mieux préparés !"}
-			],
-			
-			# Événements pendant le combat
-			"turn_events": {
-				# Au tour 3, renforts ennemis
-				3: {
-					"type": "dialogue",
-					"text": "Des renforts gobelins arrivent depuis la forêt !"
-				},
-				
-				# Au tour 5, trésor découvert
-				5: {
-					"type": "dialogue",
-					"text": "Une lueur étrange émane d'un arbre creux..."
-				}
-			},
-			
-			# Événements de position
-			"position_events": {
-				# Trésor caché
-				"12,10": {
-					"type": "treasure",
-					"item": "Potion de Soin",
-					"text": "Vous avez trouvé une Potion de Soin !"
-				}
-			}
-		},
-		
-		# Autres paramètres
-		"difficulty": "normal",
-		"music": "res://audio/music/battle_forest.ogg"
-	}
 
 func select_location(location_name: String, position: Vector2) -> void:
 	"""Sélectionne une location et propose d'y voyager"""
