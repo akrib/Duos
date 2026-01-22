@@ -55,16 +55,16 @@ var max_history_size: int = 100
 
 func _ready() -> void:
 	text_speed = default_text_speed
-	auto_mode = false  # ✅ EXPLICITEMENT false
+	auto_mode = enable_auto_mode  # ✅ CORRECTION: Utiliser la variable export
 	
 	# Créer le BarkSystem
 	bark_system = BarkSystem.new()
 	add_child(bark_system)
 	
-	# Connexion à l'EventBus
 	_connect_to_event_bus()
 	
-	print("[Dialogue_Manager] Initialisé - auto_mode: ", auto_mode)
+	print("[Dialogue_Manager] ✅ Initialisé - auto_mode: ", auto_mode, 
+		  " (enable_auto_mode: ", enable_auto_mode, ")")
 
 func _connect_to_event_bus() -> void:
 	"""Connexion aux événements globaux"""
@@ -434,19 +434,21 @@ func _on_text_reveal_completed() -> void:
 	"""Appelé quand le texte est complètement révélé"""
 	
 	if not is_dialogue_active or not current_dialogue:
+		print("[Dialogue_Manager] ⚠️ Révélation terminée mais dialogue inactif")
 		return
 	
 	var line = current_dialogue.lines[current_line_index]
 	
-	# ✅ CORRECTION : Auto-advance UNIQUEMENT si :
-	# 1. Le mode auto est activé
-	# 2. La ligne n'a pas explicitement auto_advance: false
-	if auto_mode and line.get("auto_advance", true):
+	# ✅ DEBUG: Afficher l'état
+	print("[Dialogue_Manager] 📖 Texte révélé - auto_mode: ", auto_mode, 
+		  ", line.auto_advance: ", line.get("auto_advance", "NON DÉFINI"))
+	
+	# Auto-advance UNIQUEMENT si mode auto activé ET ligne autorise auto-advance
+	if auto_mode and line.get("auto_advance", false):  # ✅ CHANGÉ: default false au lieu de true
 		var delay = _calculate_reading_time(line)
 		
 		print("[Dialogue_Manager] ⏰ Auto-advance dans ", delay, "s")
 		
-		# Créer le timer MAINTENANT (après révélation du texte)
 		get_tree().create_timer(delay).timeout.connect(
 			func():
 				if is_dialogue_active and current_line_index < current_dialogue.lines.size():
@@ -454,8 +456,7 @@ func _on_text_reveal_completed() -> void:
 					advance_dialogue()
 		)
 	else:
-		print("[Dialogue_Manager] ⏸️ Attente input utilisateur")
-
+		print("[Dialogue_Manager] ⏸️ Attente input utilisateur (auto_mode: ", auto_mode, ")")
 
 # ============================================================================
 # NETTOYAGE

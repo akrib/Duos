@@ -126,6 +126,11 @@ var is_camera_rotating: bool = false
 # Raycasting
 var mouse_ray_length: float = 1000.0
 
+# LUA 
+var lua_scenario_module: LuaScenarioModule
+var lua_event_handler: LuaBattleEventHandler
+
+
 # ============================================================================
 # INITIALISATION
 # ============================================================================
@@ -243,6 +248,15 @@ func _initialize_modules() -> void:
 	ai_module.action_module = action_module
 	add_child(ai_module)
 	
+	lua_scenario_module = LuaScenarioModule.new()
+	add_child(lua_scenario_module)
+	
+	lua_event_handler = LuaBattleEventHandler.new()
+	lua_event_handler.battle_manager = self
+	lua_event_handler.set_lua_scenario(lua_scenario_module)
+	add_child(lua_event_handler)
+	
+	
 	_connect_modules()
 	await get_tree().process_frame
 	print("[BattleMapManager3D] Modules 3D initialisés")
@@ -273,9 +287,13 @@ func _load_objectives(objectives_data: Dictionary) -> void:
 	await get_tree().process_frame
 
 func _load_scenario(scenario_data: Dictionary) -> void:
-	if scenario_data.is_empty():
-		return
-	scenario_module.setup_scenario(scenario_data)
+	if scenario_data.has("lua_script"):
+		# Charger un scénario Lua
+		lua_scenario_module.setup_lua_scenario(scenario_data.lua_script)
+	else:
+		if scenario_data.is_empty():
+			return
+		scenario_module.setup_scenario(scenario_data)
 	await get_tree().process_frame
 
 func _spawn_units(player_units: Array, enemy_units: Array) -> void:
@@ -796,6 +814,8 @@ func _calculate_rewards(victory: bool, stats: Dictionary) -> Dictionary:
 		"gold": int(base_gold * efficiency_bonus),
 		"exp": int(base_exp * efficiency_bonus)
 	}
+
+
 
 # ============================================================================
 # NETTOYAGE

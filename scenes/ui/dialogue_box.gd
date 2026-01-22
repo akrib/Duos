@@ -60,8 +60,11 @@ var selected_choice_index: int = 0
 # ============================================================================
 
 func _ready() -> void:
-	# Configuration initiale
-	hide_dialogue_box()
+	# ✅ Configuration initiale - état invisible par défaut
+	# N'utilise PAS hide_dialogue_box() qui pourrait écraser un show_dialogue_box() précédent
+	if not visible:
+		visible = false
+		modulate.a = 0.0
 	
 	# BBCode activé
 	if text_label:
@@ -73,7 +76,7 @@ func _ready() -> void:
 		continue_indicator.visible = false
 		_animate_continue_indicator()
 	
-	print("[DialogueBox] Initialisée")
+	print("[DialogueBox] ✅ Initialisée - visible:", visible, " modulate.a:", modulate.a)
 
 # ============================================================================
 # AFFICHAGE

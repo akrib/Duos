@@ -221,6 +221,7 @@ func _generate_text_key(speaker: String, text: String) -> String:
 # ============================================================================
 
 ## Créer un dialogue rapide en code
+## Créer un dialogue rapide en code
 static func quick_dialogue(id: String, lines_data: Array) -> DialogueData:
 	"""
 	Crée rapidement un dialogue depuis un array
@@ -231,7 +232,10 @@ static func quick_dialogue(id: String, lines_data: Array) -> DialogueData:
 	
 	for line_data in lines_data:
 		if line_data.size() >= 2:
-			dialogue.add_line(line_data[0], line_data[1])
+			# ✅ CORRECTION: Désactiver l'auto-advance par défaut
+			dialogue.add_line(line_data[0], line_data[1], {
+				"auto_advance": false  # <-- IMPORTANT !
+			})
 	
 	return dialogue
 
