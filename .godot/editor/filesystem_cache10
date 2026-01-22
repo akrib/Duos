@@ -1,5 +1,5 @@
 63f7b34db8d8cdea90c76aacccf841ec
-::res://::1769079524
+::res://::1769080176
 icon.svg::CompressedTexture2D::7093665754155309580::1768911536::1768915858::1::::<><><>0<>0<>1fca6a6c827ada54f939538ade83ea7a<>res://.godot/imported/icon.svg-218a8f2b3041327d8a5756f3a245f83b.ctex::
 ::res://localization/::1768983024
 dialogues.csv::Translation::8465023859381499281::1768911750::1768983024::1::::<><><>0<>0<>71ae460bf05b4c12beae193de26cf8be<>res://localization/dialogues.en.translation<*>res://localization/dialogues.fr.translation<*>res://localization/dialogues.es.translation::
@@ -41,7 +41,7 @@ world_map.gd::GDScript::8223558549740980128::1768987616::0::1::::WorldMap<>Node2
 world_map.tscn::PackedScene::5689405860049763524::1768987616::0::1::::<><><>0<>0<><>::uid://dpfs2p4ib7fjk::::res://scenes/world/world_map.gd<>uid://byp8xytm75beo::::res://scenes/ui/dialogue_box.tscn<>uid://c8chvygqvhoci::::res://icon.svg
 ::res://scripts/::1768911536
 ::res://scripts/core/::1769076212
-dialogue_manager.gd::GDScript::2899704488990063715::1769076212::0::1::::<>Node<><>0<>0<><>::
+dialogue_manager.gd::GDScript::2899704488990063715::1769080103::0::1::::<>Node<><>0<>0<><>::
 event_bus.gd::GDScript::1384015696349792230::1768983698::0::1::::<>Node<><>0<>0<><>::
 game_manager.gd::GDScript::2518667121417261448::1768911536::0::1::::<>Node<><>0<>0<><>::
 scene_loader.gd::GDScript::7883504935583718418::1768990544::0::1::::SceneLoader<>Node<><>0<>0<><>::

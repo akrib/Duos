@@ -1,6 +1,7 @@
 extends Node
 ## Dialogue_Manager - Gestionnaire central du système de dialogue
 ## Autoload qui orchestre tous les dialogues du jeu
+## ✅ VERSION CORRIGÉE: Sans double gestion de l'input
 
 #class_name Dialogue_Manager
 
@@ -22,7 +23,7 @@ signal bark_requested(speaker: String, text: String, position: Vector2)
 @export var default_text_speed: float = 50.0  # Caractères par seconde
 @export var default_auto_advance_delay: float = 2.0
 @export var enable_skip: bool = true
-@export var enable_auto_mode: bool = true
+@export var enable_auto_mode: bool = false  # ✅ CORRIGÉ: false par défaut
 @export var dialogue_sfx_volume: float = 0.0  # dB
 
 # ✅ NOUVEAU: Configuration du temps de lecture
@@ -33,7 +34,7 @@ signal bark_requested(speaker: String, text: String, position: Vector2)
 # ============================================================================
 # ÉTAT
 # ============================================================================
-
+var dialogue_manager: Dialogue_Manager
 var current_dialogue: DialogueData = null
 var current_line_index: int = 0
 var is_dialogue_active: bool = false
@@ -41,7 +42,7 @@ var dialogue_box: DialogueBox = null
 var bark_system: BarkSystem = null
 
 var text_speed: float = 50.0
-var auto_mode: bool = false
+var auto_mode: bool = false  # ✅ VÉRIFIÉ: false par défaut
 var is_skippable: bool = true
 
 # Historique
@@ -54,6 +55,7 @@ var max_history_size: int = 100
 
 func _ready() -> void:
 	text_speed = default_text_speed
+	auto_mode = false  # ✅ EXPLICITEMENT false
 	
 	# Créer le BarkSystem
 	bark_system = BarkSystem.new()
@@ -62,7 +64,7 @@ func _ready() -> void:
 	# Connexion à l'EventBus
 	_connect_to_event_bus()
 	
-	print("[Dialogue_Manager] Initialisé")
+	print("[Dialogue_Manager] Initialisé - auto_mode: ", auto_mode)
 
 func _connect_to_event_bus() -> void:
 	"""Connexion aux événements globaux"""
@@ -107,7 +109,7 @@ func start_dialogue(dialogue: DialogueData, dialogue_box_instance: DialogueBox =
 	# Afficher la première ligne
 	show_current_line()
 	
-	print("[Dialogue_Manager] Dialogue démarré : ", dialogue.dialogue_id)
+	print("[Dialogue_Manager] Dialogue démarré : ", dialogue.dialogue_id, " | auto_mode: ", auto_mode)
 
 func start_dialogue_from_id(dialogue_id: String, dialogue_box_instance: DialogueBox = null) -> void:
 	"""Démarre un dialogue à partir de son ID (depuis le registre ou fichier)"""
@@ -123,7 +125,6 @@ func start_dialogue_from_id(dialogue_id: String, dialogue_box_instance: Dialogue
 # AFFICHAGE DES LIGNES
 # ============================================================================
 
-
 func show_current_line() -> void:
 	"""Affiche la ligne actuelle du dialogue"""
 	
@@ -132,6 +133,13 @@ func show_current_line() -> void:
 		return
 	
 	var line = current_dialogue.lines[current_line_index]
+	
+	# ✅ DEBUG
+	print("[Dialogue_Manager] Affichage ligne ", current_line_index + 1, "/", current_dialogue.lines.size())
+	print("  - Speaker: ", line.get("speaker", "???"))
+	print("  - Text: ", (line.get("text", "").substr(0, 50) if line.get("text", "").length() > 50 else line.get("text", "")))
+	print("  - auto_mode: ", auto_mode)
+	print("  - line.auto_advance: ", line.get("auto_advance", "NOT SET"))
 	
 	# Ajouter à l'historique
 	_add_to_history(line)
@@ -153,19 +161,21 @@ func show_current_line() -> void:
 	# Émettre le signal
 	dialogue_line_shown.emit(line)
 	
-	# ✅ NOUVEAU: Auto-advance intelligent basé sur la longueur du texte
+	# ✅ CORRIGÉ: Auto-advance SEULEMENT si auto_mode est activé
+	# ET que la ligne n'a pas explicitement auto_advance: false
 	if auto_mode and line.get("auto_advance", true):
 		var calculated_delay = _calculate_reading_time(line)
 		
-		if OS.is_debug_build():
-			print("[Dialogue_Manager] Auto-advance dans ", calculated_delay, " secondes")
+		print("[Dialogue_Manager] ⏰ Auto-advance dans ", calculated_delay, " secondes")
 		
 		get_tree().create_timer(calculated_delay).timeout.connect(
 			func():
 				if is_dialogue_active and dialogue_box and not dialogue_box.is_text_revealing:
+					print("[Dialogue_Manager] ⏰ Auto-advance déclenché")
 					advance_dialogue()
 		)
-
+	else:
+		print("[Dialogue_Manager] ⏸️ Pas d'auto-advance (attente input utilisateur)")
 
 # ============================================================================
 # CALCUL DU TEMPS DE LECTURE
@@ -248,16 +258,22 @@ func advance_dialogue() -> void:
 	"""Avance à la ligne suivante"""
 	
 	if not is_dialogue_active:
+		print("[Dialogue_Manager] ⚠️ Tentative d'avancement mais dialogue inactif")
 		return
+	
+	# ✅ DEBUG
+	print("[Dialogue_Manager] 📖 Avancement demandé (ligne ", current_line_index, " -> ", current_line_index + 1, ")")
 	
 	# Si le texte est en train d'apparaître, le compléter
 	if dialogue_box and dialogue_box.is_text_revealing:
+		print("[Dialogue_Manager] 📖 Complétion du texte en cours de révélation")
 		dialogue_box.complete_text()
 		return
 	
 	current_line_index += 1
 	
 	if current_line_index >= current_dialogue.lines.size():
+		print("[Dialogue_Manager] 🏁 Fin du dialogue atteinte")
 		end_dialogue()
 	else:
 		show_current_line()
@@ -266,8 +282,10 @@ func skip_dialogue() -> void:
 	"""Skip le dialogue entier (si autorisé)"""
 	
 	if not is_skippable or not enable_skip:
+		print("[Dialogue_Manager] ⛔ Skip non autorisé")
 		return
 	
+	print("[Dialogue_Manager] ⏩ Skip dialogue demandé")
 	end_dialogue()
 
 func end_dialogue() -> void:
@@ -291,7 +309,7 @@ func end_dialogue() -> void:
 	current_dialogue = null
 	current_line_index = 0
 	
-	print("[Dialogue_Manager] Dialogue terminé : ", dialogue_id)
+	print("[Dialogue_Manager] 🏁 Dialogue terminé : ", dialogue_id)
 
 # ============================================================================
 # BARKS (Messages courts)
@@ -369,14 +387,18 @@ func clear_history() -> void:
 func set_text_speed(speed: float) -> void:
 	"""Change la vitesse du texte"""
 	text_speed = clamp(speed, 10.0, 200.0)
+	print("[Dialogue_Manager] Vitesse du texte: ", text_speed)
 
 func set_auto_mode(enabled: bool) -> void:
 	"""Active/désactive le mode auto"""
 	auto_mode = enabled
+	print("[Dialogue_Manager] Mode auto: ", "ON" if auto_mode else "OFF")
 
 func toggle_auto_mode() -> void:
 	"""Bascule le mode auto"""
 	auto_mode = not auto_mode
+	print("[Dialogue_Manager] Mode auto basculé: ", "ON" if auto_mode else "OFF")
+	EventBus.notify("Mode auto: " + ("ON" if auto_mode else "OFF"), "info")
 
 # ============================================================================
 # HELPERS
@@ -399,25 +421,19 @@ func _on_eventbus_dialogue_ended(dialogue_id: String) -> void:
 	pass
 
 # ============================================================================
-# INPUT (pour les raccourcis globaux)
+# INPUT - ✅ DÉSACTIVÉ (géré par DialogueBox)
 # ============================================================================
 
+# ✅ CORRECTION: La DialogueBox gère déjà l'input
+# Pas besoin de le faire ici aussi pour éviter les doubles avancements
+
+# Toutefois, on garde la possibilité de toggle l'auto-mode avec une touche
 func _input(event: InputEvent) -> void:
 	if not is_dialogue_active:
 		return
 	
-	# Avancer avec Espace/Entrée/Clic
-	if event.is_action_pressed("ui_accept"):
-		advance_dialogue()
-		get_viewport().set_input_as_handled()
-	
-	# Skip avec Ctrl
-	elif event.is_action_pressed("ui_cancel") and Input.is_key_pressed(KEY_CTRL):
-		skip_dialogue()
-		get_viewport().set_input_as_handled()
-	
-	# Toggle auto avec A
-	elif event.is_action_pressed("ui_text_toggle_auto"):
+	# Toggle auto avec Q (ui_text_toggle_auto)
+	if event.is_action_pressed("ui_text_toggle_auto"):
 		toggle_auto_mode()
 		get_viewport().set_input_as_handled()
 
