@@ -10,10 +10,10 @@ var campaign_manager: CampaignManager
 
 func _on_game_started() -> void:
 	"""Callback quand une nouvelle partie démarre"""
-	print("[GameManager] Nouvelle partie - Lancement de la campagne")
+	print("[GameManager] Nouvelle partie - Lancement de la séquence d'intro")
 	
-	# Charger la carte du monde d'abord
-	load_scene_by_id(SceneRegistry.SceneID.WORLD_MAP, true)
+	# ✅ CHANGEMENT : Charger la scène d'intro dialogue au lieu de world_map
+	load_scene_by_id(SceneRegistry.SceneID.INTRO_DIALOGUE, true)
 	
 	# Attendre que la scène soit chargée, puis lancer la campagne
 	await get_tree().create_timer(1.0).timeout

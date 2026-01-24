@@ -4,7 +4,11 @@
 return {
     id = "forest_battle",
     name = "Embuscade en Forêt",
-    
+    intro_dialogue = {
+        {speaker = "Sir Gaheris", text = "Nous y sommes. Restez vigilants."},
+        {speaker = "Elara", text = "J'entends quelque chose... Préparez-vous !"},
+        {speaker = "Chef Gobelin", text = "Krahahahaha ! Des humains ! Attaquez !"}
+    },
     -- Configuration du terrain
     terrain = {
         type = "forest",  -- ou preset "plains", "mountain", etc.

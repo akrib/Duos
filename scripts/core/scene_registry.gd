@@ -23,6 +23,7 @@ enum SceneID {
 	BATTLE_RESULTS,
 	
 	# Narration
+	INTRO_DIALOGUE,
 	CUTSCENE,
 	DIALOGUE,
 	
@@ -50,6 +51,7 @@ const SCENE_PATHS: Dictionary = {
 	SceneID.BATTLE_RESULTS: "res://scenes/battle/battle_results.tscn",
 	
 	# Narration
+	SceneID.INTRO_DIALOGUE: "res://scenes/narrative/intro_dialogue.tscn",
 	SceneID.CUTSCENE: "res://scenes/narrative/cutscene.tscn",
 	SceneID.DIALOGUE: "res://scenes/narrative/dialogue.tscn",
 	

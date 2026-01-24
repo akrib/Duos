@@ -109,24 +109,54 @@ func _advance_campaign() -> void:
 	campaign_state.current_battle += 1
 	# Logique de progression...
 
-#func _load_campaign_flow() -> void:
-	#var error = LuaManager.load_script("res://lua/campaign/campaign_flow.lua")
-	#if error:
-		#push_error("[CampaignManager] Erreur chargement campaign_flow")
-		#return
-	#
-	#campaign_flow = LuaManager.call_lua_function("", [])
-	#print("[CampaignManager] Flux de campagne chargé : ", campaign_flow.chapters.size(), " chapitres")
-#
-#func get_current_battle_id() -> String:
-	#var chapter_idx = campaign_state.current_chapter - 1
-	#var battle_idx = campaign_state.current_battle - 1
-	#
-	#if chapter_idx >= campaign_flow.chapters.size():
-		#return ""
-	#
-	#var chapter = campaign_flow.chapters[chapter_idx]
-	#if battle_idx >= chapter.battles.size():
-		#return ""
-	#
-	#return chapter.battles[battle_idx]
+func start_new_campaign() -> void:
+	print("[CampaignManager] 🎮 Démarrage nouvelle campagne (Lua)")
+	
+	# Charger les données de démarrage depuis Lua
+	var campaign_data = _load_campaign_start_from_lua()
+	
+	if campaign_data.is_empty():
+		push_error("[CampaignManager] Impossible de charger campaign_start.lua")
+		return
+	
+	# Initialiser l'état de la campagne depuis Lua
+	if campaign_data.has("initial_state"):
+		var initial_state = campaign_data.initial_state
+		campaign_state.current_chapter = initial_state.get("chapter", 1)
+		campaign_state.current_battle = initial_state.get("battle_index", 0)
+		campaign_state.battles_won = initial_state.get("battles_won", 0)
+	
+	# Émettre l'événement
+	EventBus.campaign_started.emit()
+	
+	print("[CampaignManager] ✅ Campagne initialisée : ", campaign_data.get("campaign_id"))
+
+## Charge le fichier campaign_start.lua
+func _load_campaign_start_from_lua() -> Dictionary:
+	var lua_path = "res://lua/campaign/campaign_start.lua"
+	
+	if not FileAccess.file_exists(lua_path):
+		push_error("[CampaignManager] Fichier introuvable : ", lua_path)
+		return {}
+	
+	var error = LuaManager.load_script(lua_path, false)
+	if error:
+		push_error("[CampaignManager] Erreur Lua : ", error.message)
+		return {}
+	
+	# Lire et exécuter le contenu
+	var file = FileAccess.open(lua_path, FileAccess.READ)
+	var lua_content = file.get_as_text()
+	file.close()
+	
+	var lua = LuaAPI.new()
+	lua.bind_libraries(["base", "table", "string"])
+	lua.do_string(lua_content)
+	
+	var data = lua.pull_variant("_RESULT")
+	
+	if typeof(data) != TYPE_DICTIONARY:
+		push_error("[CampaignManager] Format invalide pour campaign_start.lua")
+		return {}
+	
+	return data
