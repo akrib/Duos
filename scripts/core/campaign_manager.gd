@@ -23,7 +23,7 @@ const BATTLE_DATA_PATHS: Dictionary = {
 
 func _ready() -> void:
 	EventBus.safe_connect("battle_ended", _on_battle_ended)
-	_load_campaign_flow()
+	#_load_campaign_flow()
 	print("[CampaignManager] Initialisé (mode Lua)")
 
 ## Démarrer un combat en chargeant ses données depuis Lua
@@ -109,24 +109,24 @@ func _advance_campaign() -> void:
 	campaign_state.current_battle += 1
 	# Logique de progression...
 
-func _load_campaign_flow() -> void:
-	var error = LuaManager.load_script("res://lua/campaign/campaign_flow.lua")
-	if error:
-		push_error("[CampaignManager] Erreur chargement campaign_flow")
-		return
-	
-	campaign_flow = LuaManager.call_lua_function("", [])
-	print("[CampaignManager] Flux de campagne chargé : ", campaign_flow.chapters.size(), " chapitres")
-
-func get_current_battle_id() -> String:
-	var chapter_idx = campaign_state.current_chapter - 1
-	var battle_idx = campaign_state.current_battle - 1
-	
-	if chapter_idx >= campaign_flow.chapters.size():
-		return ""
-	
-	var chapter = campaign_flow.chapters[chapter_idx]
-	if battle_idx >= chapter.battles.size():
-		return ""
-	
-	return chapter.battles[battle_idx]
+#func _load_campaign_flow() -> void:
+	#var error = LuaManager.load_script("res://lua/campaign/campaign_flow.lua")
+	#if error:
+		#push_error("[CampaignManager] Erreur chargement campaign_flow")
+		#return
+	#
+	#campaign_flow = LuaManager.call_lua_function("", [])
+	#print("[CampaignManager] Flux de campagne chargé : ", campaign_flow.chapters.size(), " chapitres")
+#
+#func get_current_battle_id() -> String:
+	#var chapter_idx = campaign_state.current_chapter - 1
+	#var battle_idx = campaign_state.current_battle - 1
+	#
+	#if chapter_idx >= campaign_flow.chapters.size():
+		#return ""
+	#
+	#var chapter = campaign_flow.chapters[chapter_idx]
+	#if battle_idx >= chapter.battles.size():
+		#return ""
+	#
+	#return chapter.battles[battle_idx]
