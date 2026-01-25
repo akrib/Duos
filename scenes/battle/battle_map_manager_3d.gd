@@ -135,23 +135,21 @@ var lua_event_handler: LuaBattleEventHandler
 # INITIALISATION
 # ============================================================================
 
+
 func _ready() -> void:
-	_setup_camera()
-	_connect_ui_buttons()
-	
-	# ✅ CORRECTION : Vérifier les données en attente APRÈS que la scène soit prête
-	print("[BattleMapManager3D] Initialisé, vérification des données en attente...")
-	
-	# Attendre un frame pour être sûr que tout est chargé
-	await get_tree().process_frame
-	
-	# Vérifier si des données de combat sont en attente
-	var pending_data = EventBus.get_pending_battle_data()
-	if not pending_data.is_empty():
-		print("[BattleMapManager3D] ✅ Données de combat récupérées")
-		call_deferred("initialize_battle", pending_data)
-	else:
-		print("[BattleMapManager3D] ⚠️ Aucune donnée de combat en attente")
+    _setup_camera()
+    _connect_ui_buttons()
+    
+    print("[BattleMapManager3D] Initialisé, vérification des données...")
+    
+    await get_tree().process_frame
+    
+    if BattleDataManager.has_battle_data():
+        var battle_data = BattleDataManager.get_battle_data()
+        print("[BattleMapManager3D] ✅ Données récupérées : ", battle_data.get("battle_id"))
+        call_deferred("initialize_battle", battle_data)
+    else:
+        push_error("[BattleMapManager3D] ❌ Aucune donnée de combat disponible")
 
 func _setup_camera() -> void:
 	camera_rig.position = Vector3.ZERO
@@ -178,34 +176,33 @@ func _connect_ui_buttons() -> void:
 	end_turn_button.pressed.connect(_on_end_turn_pressed)
 
 func initialize_battle(data: Dictionary) -> void:
-	if is_battle_active:
-		push_warning("[BattleMapManager3D] Combat déjà en cours")
-		return
+    if is_battle_active:
+        push_warning("[BattleMapManager3D] Combat déjà en cours")
+        return
+    
+    battle_data = data
+    is_battle_active = true
+    
+    print("[BattleMapManager3D] ⚔️ Initialisation du combat 3D...")
+    
+    await _initialize_modules()
+    
+    if scenario_module and dialogue_box:
+        scenario_module.dialogue_box = dialogue_box
+        print("[BattleMapManager3D] DialogueBox configurée pour le scenario_module")
+    
+    await _load_terrain(data.get("terrain", "plains"))
+    await _load_objectives(data.get("objectives", {}))
+    await _load_scenario(data.get("scenario", {}))
+    await _spawn_units(data.get("player_units", []), data.get("enemy_units", []))
+    await _start_battle()
+    
+    # ✅ NOUVEAU : Nettoyer les données après usage
+    # BattleDataManager.clear_battle_data()  # Optionnel ici, déjà fait par signal battle_ended
+    
+    print("[BattleMapManager3D] ✅ Combat prêt !")
+    battle_map_ready.emit()
 	
-	battle_data = data
-	is_battle_active = true
-	
-	print("[BattleMapManager3D] ⚔️ Initialisation du combat 3D...")
-	
-	await _initialize_modules()
-	
-	# ✅ CORRECTION : Passer la DialogueBox au scenario_module
-	if scenario_module and dialogue_box:
-		scenario_module.dialogue_box = dialogue_box
-		print("[BattleMapManager3D] DialogueBox configurée pour le scenario_module")
-	
-	await _load_terrain(data.get("terrain", "plains"))
-	await _load_objectives(data.get("objectives", {}))
-	await _load_scenario(data.get("scenario", {}))
-	await _spawn_units(data.get("player_units", []), data.get("enemy_units", []))
-	await _start_battle()
-	
-	# ✅ IMPORTANT : Nettoyer les données après utilisation
-	EventBus.clear_battle_data()
-	
-	print("[BattleMapManager3D] ✅ Combat prêt !")
-	battle_map_ready.emit()
-
 # ============================================================================
 # INITIALISATION DES MODULES (identique)
 # ============================================================================

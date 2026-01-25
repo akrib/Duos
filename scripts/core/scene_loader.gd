@@ -34,7 +34,8 @@ const AUTOLOAD_NAMES: Array[String] = [
 	"EventBus",
 	"GameManager", 
 	"Dialogue_Manager",
-	"LuaManager"
+	"LuaManager",
+	"BattleDataManager"
 ]
 
 # ============================================================================

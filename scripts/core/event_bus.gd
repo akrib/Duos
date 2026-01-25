@@ -21,7 +21,7 @@ signal return_to_menu_requested()
 signal quit_game_requested()
 
 # --- Combat ---
-signal battle_started(battle_data: Dictionary)
+signal battle_started(battle_id: String)
 signal battle_ended(results: Dictionary)
 signal duo_formed(unit_a: Node, unit_b: Node)
 signal duo_broken(unit_a: Node, unit_b: Node)
@@ -72,16 +72,6 @@ signal campaign_completed()
 signal chapter_changed(chapter_id: int)
 
 # ============================================================================
-# FILE D'ATTENTE POUR DONNÉES PERSISTANTES
-# ============================================================================
-
-# Certains événements nécessitent que les données survivent au changement de scène
-var _pending_battle_data: Dictionary = {}
-var _battle_data_ready: bool = false
-
-
-
-# ============================================================================
 # MÉTHODES UTILITAIRES
 # ============================================================================
 
@@ -115,14 +105,10 @@ func safe_connect(signal_name: String, callable: Callable, flags: int = 0) -> vo
 	connect(signal_name, callable, flags)
 	
 	# NOUVEAU : Si c'est battle_started et qu'on a des données en attente, les envoyer immédiatement
-	if signal_name == "battle_started" and _battle_data_ready:
-		print("[EventBus] ✅ Listener de combat connecté, envoi des données en attente")
-		callable.call(_pending_battle_data)
-		# _clear_battle_data()
+	#if signal_name == "battle_started" and _battle_data_ready:
+		#print("[EventBus] ✅ Listener de combat connecté, envoi des données en attente")
+		#callable.call(_pending_battle_data)
 
-func clear_battle_data() -> void:
-	"""Nettoie manuellement les données de combat - à appeler par le récepteur"""
-	_clear_battle_data()
 
 ## Déconnexion sécurisée
 func safe_disconnect(signal_name: String, callable: Callable) -> void:
@@ -170,33 +156,9 @@ func break_duo(unit_a: Node, unit_b: Node) -> void:
 func attack(attacker: Node, target: Node, damage: int) -> void:
 	unit_attacked.emit(attacker, target, damage)
 
-## Début de combat (MODIFIÉ)
-func start_battle(data: Dictionary) -> void:
-	print("[EventBus] 📦 Stockage des données de combat")
-	
-	# Stocker les données
-	_pending_battle_data = data.duplicate(true)
-	_battle_data_ready = true
-	
-	# Émettre le signal (au cas où un listener existe déjà)
-	battle_started.emit(data)
-	
-	# Si personne n'écoute, les données restent disponibles via safe_connect
-
-## Récupération des données de combat (NOUVEAU)
-func get_pending_battle_data() -> Dictionary:
-	"""Récupère les données de combat en attente (si aucun listener automatique)"""
-	if _battle_data_ready:
-		var data = _pending_battle_data.duplicate(true)
-		_clear_battle_data()
-		return data
-	return {}
-
-## Nettoyage des données de combat
-func _clear_battle_data() -> void:
-	_pending_battle_data.clear()
-	_battle_data_ready = false
-	print("[EventBus] 🧹 Données de combat nettoyées")
+	#_pending_battle_data.clear()
+	#_battle_data_ready = false
+	#print("[EventBus] 🧹 Données de combat nettoyées")
 
 ## Fin de combat
 func end_battle(results: Dictionary) -> void:
@@ -216,12 +178,23 @@ func debug_list_connections() -> void:
 				var method = connection["callable"].get_method()
 				print("  -> ", target.name if target else "null", ".", method)
 	
-	# Afficher les données en attente
-	if _battle_data_ready:
-		print("\n⚠️  Données de combat en attente (battle_id: ", _pending_battle_data.get("battle_id", "N/A"), ")")
-	
+	## Afficher les données en attente
+	#if _battle_data_ready:
+		#print("\n⚠️  Données de combat en attente (battle_id: ", _pending_battle_data.get("battle_id", "N/A"), ")")
+	#
 	print("\n=====================================\n")
 	
 	# Helper methods
 func show_bark(speaker: String, text_key: String, position: Vector2) -> void:
 	dialogue_bark_requested.emit(speaker, text_key, position)
+
+
+func start_battle(battle_id: String) -> void:
+	"""
+	Émet le signal de début de combat
+	Les données doivent être stockées dans BattleDataManager AVANT cet appel
+	
+	@param battle_id : Identifiant du combat à démarrer
+	"""
+	print("[EventBus] 🎬 Début du combat : ", battle_id)
+	battle_started.emit(battle_id)

@@ -27,23 +27,33 @@ func _ready() -> void:
 	print("[CampaignManager] Initialisé (mode Lua)")
 
 ## Démarrer un combat en chargeant ses données depuis Lua
+# ✅ APRÈS
 func start_battle(battle_id: String) -> void:
+	"""Démarre un combat en chargeant et validant ses données"""
 	print("[CampaignManager] 🎯 Chargement du combat : ", battle_id)
 	
-	# Charger les données depuis Lua
+	# 1. Charger les données depuis Lua
 	var battle_data = load_battle_data_from_lua(battle_id)
 	
 	if battle_data.is_empty():
 		push_error("[CampaignManager] Impossible de charger : ", battle_id)
 		return
 	
-	# Ajouter un ID unique pour cette instance
+	# 2. Ajouter un ID unique d'instance
 	battle_data["battle_id"] = battle_id + "_" + str(Time.get_unix_time_from_system())
 	
-	battle_started.emit(battle_id)
+	# 3. ✅ STOCKER dans BattleDataManager
+	var stored = BattleDataManager.set_battle_data(battle_data)
 	
-	# Lancer le combat
-	EventBus.start_battle(battle_data)
+	if not stored:
+		push_error("[CampaignManager] ❌ Données de combat invalides pour : ", battle_id)
+		return
+		
+	# 4. Émettre les signaux
+	battle_started.emit(battle_id)
+	EventBus.start_battle(battle_data["battle_id"])  # ✅ Juste l'ID
+	
+	# 5. Changer de scène
 	EventBus.change_scene(SceneRegistry.SceneID.BATTLE)
 
 ## Charge un fichier Lua de données de combat
