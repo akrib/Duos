@@ -1,0 +1,227 @@
+# scripts/core/lua_data_loader.gd
+extends Node
+class_name LuaDataLoader
+
+## ⚙️ HELPER CENTRALISÉ POUR LE CHARGEMENT DE FICHIERS LUA
+## 
+## Responsabilités :
+## - Charger et exécuter des fichiers .lua
+## - Convertir les données Lua en types Godot
+## - Cache pour éviter les rechargements
+## - Gestion d'erreurs unifiée
+## 
+## Usage :
+##   var data = LuaDataLoader.load_lua_data("res://lua/items/potions.lua")
+##   var item = data.get("healing_potion")
+
+# ============================================================================
+# CACHE GLOBAL
+# ============================================================================
+
+static var _cache: Dictionary = {}
+static var _lua_instances: Dictionary = {}  # Une instance LuaAPI par fichier
+
+# ============================================================================
+# CHARGEMENT PRINCIPAL
+# ============================================================================
+
+## Charge un fichier Lua et retourne ses données
+## 
+## @param lua_path : Chemin vers le fichier .lua
+## @param use_cache : Utiliser le cache (true par défaut)
+## @param convert_types : Convertir automatiquement les types Lua en Godot
+## @return Dictionary contenant les données Lua, ou {} en cas d'erreur
+static func load_lua_data(lua_path: String, use_cache: bool = true, convert_types: bool = true) -> Variant:
+	# Vérifier le cache
+	if use_cache and _cache.has(lua_path):
+		return _cache[lua_path]
+	
+	# Vérifier que le fichier existe
+	if not FileAccess.file_exists(lua_path):
+		push_error("[LuaDataLoader] Fichier introuvable : ", lua_path)
+		return {}
+	
+	# Charger et exécuter le fichier
+	var raw_data = _execute_lua_file(lua_path)
+	
+	if typeof(raw_data) == TYPE_NIL:
+		return {}
+	
+	# Conversion optionnelle des types
+	var processed_data = raw_data
+	if convert_types:
+		processed_data = _convert_lua_to_godot(raw_data)
+	
+	# Mettre en cache
+	if use_cache:
+		_cache[lua_path] = processed_data
+	
+	return processed_data
+
+## Charge plusieurs fichiers Lua d'un dossier
+## 
+## @param folder_path : Chemin vers le dossier contenant les .lua
+## @param use_cache : Utiliser le cache
+## @return Dictionary fusionné de tous les fichiers
+static func load_lua_folder(folder_path: String, use_cache: bool = true) -> Dictionary:
+	var merged_data: Dictionary = {}
+	var files = _get_lua_files_in_folder(folder_path)
+	
+	for file_name in files:
+		var file_path = folder_path.path_join(file_name)
+		var data = load_lua_data(file_path, use_cache)
+		
+		if typeof(data) == TYPE_DICTIONARY:
+			merged_data.merge(data)
+	
+	return merged_data
+
+# ============================================================================
+# EXÉCUTION LUA
+# ============================================================================
+
+## Exécute un fichier Lua et retourne le résultat
+static func _execute_lua_file(lua_path: String) -> Variant:
+	# Créer une instance LuaAPI dédiée
+	var lua = LuaAPI.new()
+	_setup_lua_environment(lua)
+	
+	# Lire le contenu du fichier
+	var file = FileAccess.open(lua_path, FileAccess.READ)
+	if not file:
+		push_error("[LuaDataLoader] Impossible d'ouvrir : ", lua_path)
+		return null
+	
+	var lua_content = file.get_as_text()
+	file.close()
+	
+	# Exécuter le script Lua
+	var error = lua.do_string(lua_content)
+	if error is LuaError:
+		push_error("[LuaDataLoader] Erreur Lua dans ", lua_path, " : ", error.message)
+		return null
+	
+	# Récupérer le résultat (la valeur de retour du script)
+	var result = lua.pull_variant("_RESULT")
+	
+	return result
+
+## Configure l'environnement Lua standard
+static func _setup_lua_environment(lua: LuaAPI) -> void:
+	# Bibliothèques de base
+	lua.bind_libraries(["base", "table", "string", "math"])
+	
+	# Exposer les types Godot utiles
+	lua.push_variant("Vector2i", func(x, y): return Vector2i(x, y))
+	lua.push_variant("Color", func(r, g, b, a=1.0): return Color(r, g, b, a))
+
+# ============================================================================
+# CONVERSION DE TYPES
+# ============================================================================
+
+## Convertit récursivement les données Lua en types Godot
+static func _convert_lua_to_godot(data: Variant) -> Variant:
+	match typeof(data):
+		TYPE_DICTIONARY:
+			return _convert_dict(data)
+		TYPE_ARRAY:
+			return _convert_array(data)
+		_:
+			return data
+
+## Convertit un Dictionary Lua
+static func _convert_dict(dict: Dictionary) -> Dictionary:
+	var result = {}
+	
+	for key in dict:
+		var value = dict[key]
+		
+		# Convertir les valeurs récursivement
+		result[key] = _convert_lua_to_godot(value)
+	
+	# Conversions spéciales
+	result = _apply_special_conversions(result)
+	
+	return result
+
+## Convertit un Array Lua
+static func _convert_array(arr: Array) -> Array:
+	var result = []
+	
+	for item in arr:
+		result.append(_convert_lua_to_godot(item))
+	
+	return result
+
+## Applique des conversions spéciales (position, color, etc.)
+static func _apply_special_conversions(dict: Dictionary) -> Variant:
+	# Conversion automatique de {x, y} en Vector2i
+	if dict.has("x") and dict.has("y") and dict.size() == 2:
+		if typeof(dict.x) == TYPE_INT and typeof(dict.y) == TYPE_INT:
+			return Vector2i(dict.x, dict.y)
+	
+	# Conversion automatique de {r, g, b, a} en Color
+	if dict.has("r") and dict.has("g") and dict.has("b"):
+		return Color(
+			dict.get("r", 1.0),
+			dict.get("g", 1.0),
+			dict.get("b", 1.0),
+			dict.get("a", 1.0)
+		)
+	
+	# Conversion des sous-dictionnaires
+	for key in dict:
+		if typeof(dict[key]) == TYPE_DICTIONARY:
+			dict[key] = _apply_special_conversions(dict[key])
+	
+	return dict
+
+# ============================================================================
+# UTILITAIRES
+# ============================================================================
+
+## Liste tous les fichiers .lua dans un dossier
+static func _get_lua_files_in_folder(folder_path: String) -> Array[String]:
+	var files: Array[String] = []
+	var dir = DirAccess.open(folder_path)
+	
+	if not dir:
+		push_error("[LuaDataLoader] Impossible d'ouvrir : ", folder_path)
+		return files
+	
+	dir.list_dir_begin()
+	var file_name = dir.get_next()
+	
+	while file_name != "":
+		if not dir.current_is_dir() and file_name.ends_with(".lua"):
+			files.append(file_name)
+		
+		file_name = dir.get_next()
+	
+	dir.list_dir_end()
+	return files
+
+## Vide le cache
+static func clear_cache() -> void:
+	_cache.clear()
+	print("[LuaDataLoader] Cache vidé")
+
+## Vide le cache d'un fichier spécifique
+static func clear_cache_for(lua_path: String) -> void:
+	_cache.erase(lua_path)
+	print("[LuaDataLoader] Cache vidé pour : ", lua_path)
+
+## Vérifie si un fichier est en cache
+static func is_cached(lua_path: String) -> bool:
+	return _cache.has(lua_path)
+
+## Retourne la taille du cache
+static func get_cache_size() -> int:
+	return _cache.size()
+
+## Retourne les statistiques du cache
+static func get_cache_stats() -> Dictionary:
+	return {
+		"files_cached": _cache.size(),
+		"paths": _cache.keys()
+	}
