@@ -64,18 +64,11 @@ func load_battle_data_from_lua(battle_id: String) -> Dictionary:
 	
 	var lua_path = BATTLE_DATA_PATHS[battle_id]
 	
-	# Charger le fichier Lua
-	var error = LuaManager.load_script(lua_path)
-	if error:
-		push_error("[CampaignManager] Erreur Lua : ", error.message)
-		return {}
+	# ✅ CORRECTION : Utiliser LuaDataLoader
+	var battle_data = LuaDataLoader.load_lua_data(lua_path, true, true)
 	
-	# Le script Lua retourne une table avec `return { ... }`
-	# On la récupère en appelant le script comme une fonction
-	var battle_data = LuaManager.call_lua_function("", [])
-	
-	if typeof(battle_data) != TYPE_DICTIONARY:
-		push_error("[CampaignManager] Format Lua invalide")
+	if typeof(battle_data) != TYPE_DICTIONARY or battle_data.is_empty():
+		push_error("[CampaignManager] Impossible de charger : ", battle_id)
 		return {}
 	
 	# Convertir les données Lua en format Godot
@@ -149,21 +142,8 @@ func _load_campaign_start_from_lua() -> Dictionary:
 		push_error("[CampaignManager] Fichier introuvable : ", lua_path)
 		return {}
 	
-	var error = LuaManager.load_script(lua_path, false)
-	if error:
-		push_error("[CampaignManager] Erreur Lua : ", error.message)
-		return {}
-	
-	# Lire et exécuter le contenu
-	var file = FileAccess.open(lua_path, FileAccess.READ)
-	var lua_content = file.get_as_text()
-	file.close()
-	
-	var lua = LuaAPI.new()
-	lua.bind_libraries(["base", "table", "string"])
-	lua.do_string(lua_content)
-	
-	var data = lua.pull_variant("_RESULT")
+	# ✅ CORRECTION : Utiliser LuaDataLoader
+	var data = LuaDataLoader.load_lua_data(lua_path, false, true)
 	
 	if typeof(data) != TYPE_DICTIONARY:
 		push_error("[CampaignManager] Format invalide pour campaign_start.lua")

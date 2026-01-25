@@ -47,21 +47,12 @@ func _load_campaign_start_data() -> void:
 		push_error("[IntroDialogue] Fichier introuvable : ", lua_path)
 		return
 	
-	# Charger via LuaManager
-	var error = LuaManager.load_script(lua_path, false)
-	if error:
-		push_error("[IntroDialogue] Erreur Lua : ", error.message)
+	# ✅ CORRECTION : Utiliser LuaDataLoader au lieu de faire manuellement
+	campaign_start_data = LuaDataLoader.load_lua_data(lua_path, false, true)
+	
+	if typeof(campaign_start_data) != TYPE_DICTIONARY or campaign_start_data.is_empty():
+		push_error("[IntroDialogue] Impossible de charger campaign_start.lua")
 		return
-	
-	# Récupérer les données
-	var file = FileAccess.open(lua_path, FileAccess.READ)
-	var lua_content = file.get_as_text()
-	file.close()
-	
-	var lua = LuaAPI.new()
-	lua.bind_libraries(["base", "table", "string"])
-	lua.do_string(lua_content)
-	campaign_start_data = lua.pull_variant("_RESULT")
 	
 	print("[IntroDialogue] ✅ campaign_start.lua chargé : ", campaign_start_data.get("campaign_id"))
 
