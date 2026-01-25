@@ -29,6 +29,16 @@ enum ValidationMode {
 
 static var validation_mode: ValidationMode = ValidationMode.STRICT
 
+static var validation_modes: Dictionary = {
+	"ability": ValidationMode.STRICT,
+	"enemy": ValidationMode.STRICT,
+	"item": ValidationMode.PERMISSIVE,  # On peut skip des items
+	"dialogue": ValidationMode.PERMISSIVE,  # Mieux qu'un crash
+}
+
+static func get_validation_mode_for(type: String) -> ValidationMode:
+	return validation_modes.get(type, ValidationMode.STRICT)
+
 # ============================================================================
 # CHARGEMENT PRINCIPAL
 # ============================================================================

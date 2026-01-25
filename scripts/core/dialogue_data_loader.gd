@@ -2,13 +2,15 @@
 extends Node
 class_name DialogueDataLoader
 
-## ✅ VERSION REFACTORISÉE - Utilise LuaDataLoader
-
 const DIALOGUES_PATH = "res://lua/dialogues/"
 
 var _dialogue_cache: Dictionary = {}
 
-## Charge un dialogue depuis Lua (via le helper centralisé)
+# ============================================================================
+# CHARGEMENT
+# ============================================================================
+
+## Charge un dialogue depuis Lua (avec validation)
 func load_dialogue(dialogue_id: String) -> Dictionary:
 	print("[DialogueDataLoader] Chargement du dialogue : ", dialogue_id)
 	
@@ -20,20 +22,36 @@ func load_dialogue(dialogue_id: String) -> Dictionary:
 	# Construire le chemin
 	var lua_path = DIALOGUES_PATH + dialogue_id + ".lua"
 	
-	# ✅ UTILISER LE HELPER CENTRALISÉ
+	# Charger via LuaDataLoader
 	var raw_data = LuaDataLoader.load_lua_data(lua_path, true, true)
 	
 	if typeof(raw_data) != TYPE_DICTIONARY or raw_data.is_empty():
 		push_error("[DialogueDataLoader] Impossible de charger : ", dialogue_id)
 		return {}
 	
-	# Post-traitement spécifique aux dialogues (si nécessaire)
+	# ✅ VALIDATION
+	var validation = DataValidator.validate_dialogue(raw_data, dialogue_id)
+	
+	if not validation.valid:
+		push_error("[DialogueDataLoader] ❌ Dialogue invalide : ", dialogue_id)
+		for error in validation.errors:
+			push_error("  - ", error)
+		
+		# Mode strict : retourner vide
+		if LuaDataLoader.validation_mode == LuaDataLoader.ValidationMode.STRICT:
+			return {}
+	
+	# Warnings
+	for warning in validation.warnings:
+		push_warning("[DialogueDataLoader] ⚠️ ", dialogue_id, " : ", warning)
+	
+	# Post-traitement spécifique aux dialogues
 	var dialogue_data = _post_process_dialogue(raw_data)
 	
 	# Mettre en cache
 	_dialogue_cache[dialogue_id] = dialogue_data
 	
-	print("[DialogueDataLoader] ✅ Dialogue chargé : ", dialogue_id)
+	print("[DialogueDataLoader] ✅ Dialogue chargé et validé : ", dialogue_id)
 	return dialogue_data
 
 ## Post-traitement spécifique aux dialogues
