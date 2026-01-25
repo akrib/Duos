@@ -27,6 +27,22 @@ static func load_enemies_from_file(file_name: String, use_cache: bool = true) ->
 	
 	for enemy_id in raw_enemies:
 		var enemy_data = raw_enemies[enemy_id]
+		
+		# ✅ VALIDATION
+		var validation = DataValidator.validate_enemy(enemy_data, enemy_id)
+		
+		if not validation.valid:
+			push_error("[EnemyDataLoader] ❌ Ennemi invalide : ", enemy_id)
+			for error in validation.errors:
+				push_error("  - ", error)
+			
+			if LuaDataLoader.validation_mode == LuaDataLoader.ValidationMode.STRICT:
+				continue
+		
+		# Warnings
+		for warning in validation.warnings:
+			push_warning("[EnemyDataLoader] ⚠️ ", enemy_id, " : ", warning)
+		
 		if typeof(enemy_data) == TYPE_DICTIONARY:
 			processed[enemy_id] = enemy_data
 			_enemy_cache[enemy_id] = enemy_data

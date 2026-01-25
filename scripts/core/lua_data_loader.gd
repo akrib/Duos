@@ -21,6 +21,14 @@ class_name LuaDataLoader
 static var _cache: Dictionary = {}
 static var _lua_instances: Dictionary = {}  # Une instance LuaAPI par fichier
 
+# ✅ NOUVEAU : Mode de validation
+enum ValidationMode {
+	STRICT,    # Refuse les données invalides
+	PERMISSIVE # Accepte mais log les erreurs
+}
+
+static var validation_mode: ValidationMode = ValidationMode.STRICT
+
 # ============================================================================
 # CHARGEMENT PRINCIPAL
 # ============================================================================
@@ -31,33 +39,66 @@ static var _lua_instances: Dictionary = {}  # Une instance LuaAPI par fichier
 ## @param use_cache : Utiliser le cache (true par défaut)
 ## @param convert_types : Convertir automatiquement les types Lua en Godot
 ## @return Dictionary contenant les données Lua, ou {} en cas d'erreur
-static func load_lua_data(lua_path: String, use_cache: bool = true, convert_types: bool = true) -> Variant:
-	# Vérifier le cache
+# ✅ APRÈS
+static func load_lua_data(
+	lua_path: String, 
+	use_cache: bool = true, 
+	convert_types: bool = true,
+	validate_fn: Callable = Callable()  # ✅ NOUVEAU : fonction de validation optionnelle
+) -> Variant:
+	"""
+	Charge un fichier Lua avec validation optionnelle
+	
+	@param lua_path : Chemin du fichier
+	@param use_cache : Utiliser le cache
+	@param convert_types : Convertir les types Lua → Godot
+	@param validate_fn : Fonction de validation (ex: DataValidator.validate_ability)
+	"""
+	
+	# Cache
 	if use_cache and _cache.has(lua_path):
 		return _cache[lua_path]
 	
-	# Vérifier que le fichier existe
+	# Vérifier existence
 	if not FileAccess.file_exists(lua_path):
 		push_error("[LuaDataLoader] Fichier introuvable : ", lua_path)
 		return {}
 	
-	# Charger et exécuter le fichier
+	# Exécution
 	var raw_data = _execute_lua_file(lua_path)
 	
 	if typeof(raw_data) == TYPE_NIL:
 		return {}
 	
-	# Conversion optionnelle des types
+	# Conversion
 	var processed_data = raw_data
 	if convert_types:
 		processed_data = _convert_lua_to_godot(raw_data)
 	
-	# Mettre en cache
+	# ✅ NOUVEAU : Validation
+	if validate_fn.is_valid():
+		var validation_result = validate_fn.call(processed_data)
+		
+		if validation_result and validation_result.has("valid"):
+			if not validation_result.valid:
+				var errors = validation_result.get("errors", [])
+				
+				if validation_mode == ValidationMode.STRICT:
+					push_error("[LuaDataLoader] ❌ Données invalides : ", lua_path)
+					for error in errors:
+						push_error("  - ", error)
+					return {}
+				else:  # PERMISSIVE
+					push_warning("[LuaDataLoader] ⚠️ Données avec erreurs : ", lua_path)
+					for error in errors:
+						push_warning("  - ", error)
+	
+	# Cache
 	if use_cache:
 		_cache[lua_path] = processed_data
 	
 	return processed_data
-
+	
 ## Charge plusieurs fichiers Lua d'un dossier
 ## 
 ## @param folder_path : Chemin vers le dossier contenant les .lua

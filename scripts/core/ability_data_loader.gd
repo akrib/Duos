@@ -23,21 +23,61 @@ static var _ability_cache: Dictionary = {}
 # ============================================================================
 
 ## Charge toutes les capacités (lazy-safe)
+#static func load_all_abilities(use_cache: bool = true) -> Dictionary:
+	#if use_cache and not _ability_cache.is_empty():
+		#return _ability_cache
+	#
+	#var raw_data = LuaDataLoader.load_lua_folder(ABILITIES_PATH, use_cache)
+	#
+	#if typeof(raw_data) != TYPE_DICTIONARY:
+		#push_error("[AbilityDataLoader] Données invalides")
+		#return {}
+	#
+	#for ability_id in raw_data:
+		#_ability_cache[ability_id] = _post_process_ability(raw_data[ability_id])
+	#
+	#print("[AbilityDataLoader] ✅ ", _ability_cache.size(), " capacités chargées")
+	#return _ability_cache
+
+
+# ✅ APRÈS (avec validation)
 static func load_all_abilities(use_cache: bool = true) -> Dictionary:
 	if use_cache and not _ability_cache.is_empty():
 		return _ability_cache
 	
+	# ✅ Charger avec validation
 	var raw_data = LuaDataLoader.load_lua_folder(ABILITIES_PATH, use_cache)
 	
 	if typeof(raw_data) != TYPE_DICTIONARY:
 		push_error("[AbilityDataLoader] Données invalides")
 		return {}
 	
+	# ✅ NOUVEAU : Valider chaque capacité
 	for ability_id in raw_data:
-		_ability_cache[ability_id] = _post_process_ability(raw_data[ability_id])
+		var ability_data = raw_data[ability_id]
+		
+		# Validation
+		var validation = DataValidator.validate_ability(ability_data, ability_id)
+		
+		if not validation.valid:
+			push_error("[AbilityDataLoader] ❌ Capacité invalide : ", ability_id)
+			for error in validation.errors:
+				push_error("  - ", error)
+			
+			# Mode strict : on skip
+			if LuaDataLoader.validation_mode == LuaDataLoader.ValidationMode.STRICT:
+				continue
+		
+		# Warnings
+		for warning in validation.warnings:
+			push_warning("[AbilityDataLoader] ⚠️ ", ability_id, " : ", warning)
+		
+		# Post-processing et stockage
+		_ability_cache[ability_id] = _post_process_ability(ability_data)
 	
-	print("[AbilityDataLoader] ✅ ", _ability_cache.size(), " capacités chargées")
+	print("[AbilityDataLoader] ✅ ", _ability_cache.size(), " capacités chargées et validées")
 	return _ability_cache
+
 
 ## Charge une capacité spécifique
 static func load_ability(ability_id: String) -> Dictionary:
