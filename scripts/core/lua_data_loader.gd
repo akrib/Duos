@@ -95,17 +95,23 @@ static func _execute_lua_file(lua_path: String) -> Variant:
 	var lua_content = file.get_as_text()
 	file.close()
 	
+	# ✅ CORRECTION : Wrapper le script dans une fonction pour capturer le return
+	var wrapped_code = "_lua_loader_fn = function() " + lua_content + " end; _RESULT = _lua_loader_fn()"
+	
 	# Exécuter le script Lua
-	var error = lua.do_string(lua_content)
+	var error = lua.do_string(wrapped_code)
 	if error is LuaError:
 		push_error("[LuaDataLoader] Erreur Lua dans ", lua_path, " : ", error.message)
 		return null
 	
-	# Récupérer le résultat (la valeur de retour du script)
+	# Récupérer le résultat
 	var result = lua.pull_variant("_RESULT")
 	
+	# Nettoyer
+	lua.do_string("_lua_loader_fn = nil; _RESULT = nil")
+	
 	return result
-
+	
 ## Configure l'environnement Lua standard
 static func _setup_lua_environment(lua: LuaAPI) -> void:
 	# Bibliothèques de base
