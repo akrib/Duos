@@ -30,7 +30,6 @@ class_name WorldMap
 var world_map_data: Dictionary = {}
 var locations: Dictionary = {}  # location_id -> WorldMapLocation
 var player: WorldMapPlayer = null
-# Ajouter une variable pour stocker les connexions
 var connections: Dictionary = {}  # connection_id -> WorldMapConnection
 
 # ============================================================================
@@ -49,7 +48,6 @@ var action_menu_container: VBoxContainer = null
 # ============================================================================
 
 func _ready() -> void:
-	#_create_containers()
 	_create_action_menu()
 	_connect_ui_buttons()
 	_load_world_map_data()
@@ -59,24 +57,6 @@ func _ready() -> void:
 	EventBus.safe_connect("notification_posted", _on_notification_posted)
 	
 	print("[WorldMap] ✅ Carte générée depuis Lua")
-
-func _create_containers() -> void:
-	"""Crée les containers si ils n'existent pas"""
-	
-	if not has_node("LocationsContainer"):
-		locations_container = Node2D.new()
-		locations_container.name = "LocationsContainer"
-		add_child(locations_container)
-	
-	if not has_node("ConnectionsContainer"):
-		connections_container = Node2D.new()
-		connections_container.name = "ConnectionsContainer"
-		add_child(connections_container)
-	
-	if not has_node("PlayerContainer"):
-		player_container = Node2D.new()
-		player_container.name = "PlayerContainer"
-		add_child(player_container)
 
 func _create_action_menu() -> void:
 	"""Crée le menu d'actions (popup)"""
@@ -162,33 +142,39 @@ func _create_locations() -> void:
 		locations_container.add_child(location)
 		locations[location_data.id] = location
 
-# Dans world_map.gd, remplacer la fonction _create_connections()
-
 # ============================================================================
-# GÉNÉRATION DE LA CARTE (MODIFIÉ)
+# GÉNÉRATION DES CONNEXIONS (CORRIGÉ)
 # ============================================================================
-
-
 
 func _create_connections() -> void:
 	"""Crée les connexions entre locations avec états"""
 	
 	var visual_config = world_map_data.get("connections_visual", {})
 	
-	# Configuration depuis JSON
+	# ✅ CORRECTION : Configurer les variables STATIQUES de classe
 	if visual_config.has("width"):
-		WorldMapConnection.line_width = visual_config.width
+		WorldMapConnection.default_line_width = visual_config.width
 	if visual_config.has("dash_length"):
-		WorldMapConnection.dash_length = visual_config.dash_length
+		WorldMapConnection.default_dash_length = visual_config.dash_length
 	
 	# Couleurs
 	if visual_config.has("color"):
 		var c = visual_config.color
-		WorldMapConnection.color_unlocked = Color(c.get("r", 0.7), c.get("g", 0.7), c.get("b", 0.7), c.get("a", 0.8))
+		WorldMapConnection.default_color_unlocked = Color(
+			c.get("r", 0.7), 
+			c.get("g", 0.7), 
+			c.get("b", 0.7), 
+			c.get("a", 0.8)
+		)
 	
 	if visual_config.has("color_locked"):
 		var c = visual_config.color_locked
-		WorldMapConnection.color_locked = Color(c.get("r", 0.3), c.get("g", 0.3), c.get("b", 0.3), c.get("a", 0.4))
+		WorldMapConnection.default_color_locked = Color(
+			c.get("r", 0.3), 
+			c.get("g", 0.3), 
+			c.get("b", 0.3), 
+			c.get("a", 0.4)
+		)
 	
 	# Charger les états des connexions depuis les données
 	var connection_states = world_map_data.get("connection_states", {})
@@ -296,7 +282,7 @@ func reveal_connection(from_id: String, to_id: String, locked: bool = true) -> v
 		else:
 			connections[connection_id].unlock()
 		print("[WorldMap] 🔍 Connexion révélée : ", connection_id)
-		
+
 # ============================================================================
 # JOUEUR
 # ============================================================================
@@ -347,9 +333,9 @@ func _on_location_clicked(location: WorldMapLocation) -> void:
 	if not current_loc:
 		return
 	
-	var connections = current_loc.get_connections()
+	var location_connections = current_loc.get_connections()
 	
-	if location.location_id in connections:
+	if location.location_id in location_connections:
 		# Déplacer le joueur
 		player.move_to_location(location)
 	else:

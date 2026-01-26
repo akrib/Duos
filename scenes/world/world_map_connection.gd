@@ -13,7 +13,19 @@ enum ConnectionState {
 }
 
 # ============================================================================
-# CONFIGURATION
+# CONFIGURATION GLOBALE (VARIABLES DE CLASSE)
+# ============================================================================
+
+# ✅ AJOUT : Variables de classe statiques pour configuration globale
+static var default_line_width: float = 4.0
+static var default_dash_length: float = 15.0
+static var default_gap_length: float = 10.0
+static var default_cross_size: float = 20.0
+static var default_color_unlocked: Color = Color(0.7, 0.7, 0.7, 0.8)
+static var default_color_locked: Color = Color(0.3, 0.3, 0.3, 0.4)
+
+# ============================================================================
+# CONFIGURATION D'INSTANCE
 # ============================================================================
 
 @export var line_width: float = 4.0
@@ -48,6 +60,14 @@ func setup(from: WorldMapLocation, to: WorldMapLocation, state: ConnectionState 
 	current_state = state
 	
 	connection_id = from.location_id + "_to_" + to.location_id
+	
+	# ✅ AJOUT : Appliquer les valeurs par défaut globales
+	line_width = default_line_width
+	dash_length = default_dash_length
+	gap_length = default_gap_length
+	cross_size = default_cross_size
+	color_unlocked = default_color_unlocked
+	color_locked = default_color_locked
 	
 	_create_visuals()
 
