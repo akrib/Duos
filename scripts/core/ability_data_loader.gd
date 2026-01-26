@@ -1,211 +1,45 @@
-# scripts/core/ability_data_loader.gd
-extends Node
+# addons/core/data/ability_data_loader.gd
 class_name AbilityDataLoader
+extends Node
 
-## 📘 DATA LOADER MÉTIER POUR LES CAPACITÉS
-##
-## Responsabilités :
-## - Charger les capacités via LuaDataLoader
-## - Maintenir un cache métier par ability_id
-## - Fournir des requêtes (par catégorie, classe, type)
-## - Implémenter la logique gameplay liée aux capacités
+## Charge les données d'abilities depuis JSON
+## Format: data/abilities/*.json
 
-const ABILITIES_PATH := "res://lua/abilities/"
+const ABILITIES_DIR = "res://data/abilities/"
 
-# ============================================================================
-# CACHE MÉTIER
-# ============================================================================
+var _json_loader: JSONDataLoader
+var abilities: Dictionary = {}
 
-static var _ability_cache: Dictionary = {}
+func _init():
+	_json_loader = JSONDataLoader.new()
 
-# ============================================================================
-# CHARGEMENT
-# ============================================================================
-
-## Charge toutes les capacités (lazy-safe)
-#static func load_all_abilities(use_cache: bool = true) -> Dictionary:
-	#if use_cache and not _ability_cache.is_empty():
-		#return _ability_cache
-	#
-	#var raw_data = LuaDataLoader.load_lua_folder(ABILITIES_PATH, use_cache)
-	#
-	#if typeof(raw_data) != TYPE_DICTIONARY:
-		#push_error("[AbilityDataLoader] Données invalides")
-		#return {}
-	#
-	#for ability_id in raw_data:
-		#_ability_cache[ability_id] = _post_process_ability(raw_data[ability_id])
-	#
-	#print("[AbilityDataLoader] ✅ ", _ability_cache.size(), " capacités chargées")
-	#return _ability_cache
-
-
-# ✅ APRÈS (avec validation)
-static func load_all_abilities(use_cache: bool = true) -> Dictionary:
-	if use_cache and not _ability_cache.is_empty():
-		return _ability_cache
+func load_all_abilities() -> void:
+	abilities = _json_loader.load_json_directory(ABILITIES_DIR, false)
 	
-	# ✅ Charger avec validation
-	var raw_data = LuaDataLoader.load_lua_folder(ABILITIES_PATH, use_cache)
-	
-	if typeof(raw_data) != TYPE_DICTIONARY:
-		push_error("[AbilityDataLoader] Données invalides")
-		return {}
-	
-	# ✅ NOUVEAU : Valider chaque capacité
-	for ability_id in raw_data:
-		var ability_data = raw_data[ability_id]
-		
-		# Validation
-		var validation = DataValidator.validate_ability(ability_data, ability_id)
-		
-		if not validation.valid:
-			push_error("[AbilityDataLoader] ❌ Capacité invalide : ", ability_id)
-			for error in validation.errors:
-				push_error("  - ", error)
-			
-			# Mode strict : on skip
-			if LuaDataLoader.validation_mode == LuaDataLoader.ValidationMode.STRICT:
-				continue
-		
-		# Warnings
-		for warning in validation.warnings:
-			push_warning("[AbilityDataLoader] ⚠️ ", ability_id, " : ", warning)
-		
-		# Post-processing et stockage
-		_ability_cache[ability_id] = _post_process_ability(ability_data)
-	
-	print("[AbilityDataLoader] ✅ ", _ability_cache.size(), " capacités chargées et validées")
-	return _ability_cache
+	if abilities.is_empty():
+		push_warning("No abilities loaded from " + ABILITIES_DIR)
+		EventBus.emit_signal("data_load_warning", "abilities", "No data found")
+	else:
+		print("Loaded %d abilities" % abilities.size())
+		EventBus.emit_signal("data_loaded", "abilities", abilities)
 
-
-## Charge une capacité spécifique
-static func load_ability(ability_id: String) -> Dictionary:
-	if _ability_cache.has(ability_id):
-		return _ability_cache[ability_id]
+func get_ability(ability_id: String) -> Dictionary:
+	if abilities.has(ability_id):
+		return abilities[ability_id]
 	
-	load_all_abilities()
-	
-	if _ability_cache.has(ability_id):
-		return _ability_cache[ability_id]
-	
-	push_error("[AbilityDataLoader] Capacité introuvable : ", ability_id)
+	push_error("Ability not found: " + ability_id)
 	return {}
 
-## Vérifie l’existence d’une capacité
-static func ability_exists(ability_id: String) -> bool:
-	if _ability_cache.has(ability_id):
-		return true
+func reload_ability(ability_id: String) -> void:
+	var file_path = ABILITIES_DIR.path_join(ability_id + ".json")
+	_json_loader.clear_cache(file_path)
+	var data = _json_loader.load_json_file(file_path)
 	
-	load_all_abilities()
-	return _ability_cache.has(ability_id)
+	if data:
+		abilities[ability_id] = data
+		EventBus.emit_signal("ability_reloaded", ability_id)
 
-# ============================================================================
-# POST-TRAITEMENT
-# ============================================================================
-
-## Post-traitement métier (Lua → gameplay)
-static func _post_process_ability(raw_data: Dictionary) -> Dictionary:
-	var ability := raw_data.duplicate(true)
-
-	# Valeurs par défaut
-	if not ability.has("type"):
-		ability.type = "active"
-
-	if not ability.has("cost"):
-		ability.cost = {}
-
-	if not ability.has("effects"):
-		ability.effects = []
-
-	return ability
-
-# ============================================================================
-# REQUÊTES
-# ============================================================================
-
-static func get_abilities_by_category(category: String) -> Array:
-	load_all_abilities()
-	
-	var result := []
-	for ability in _ability_cache.values():
-		if ability.get("category") == category:
-			result.append(ability)
-	return result
-
-static func get_abilities_by_class(class__name: String) -> Array:
-	load_all_abilities()
-	
-	var result := []
-	for ability in _ability_cache.values():
-		if ability.get("class") == class__name:
-			result.append(ability)
-	return result
-
-static func get_active_abilities() -> Array:
-	load_all_abilities()
-	
-	var result := []
-	for ability in _ability_cache.values():
-		if ability.get("type") == "active":
-			result.append(ability)
-	return result
-
-static func get_passive_abilities() -> Array:
-	load_all_abilities()
-	
-	var result := []
-	for ability in _ability_cache.values():
-		if ability.get("type") == "passive":
-			result.append(ability)
-	return result
-
-# ============================================================================
-# LOGIQUE GAMEPLAY
-# ============================================================================
-
-## Vérifie si une unité peut utiliser une capacité
-static func can_use_ability(unit_data: Dictionary, ability_id: String) -> bool:
-	var ability = load_ability(ability_id)
-	if ability.is_empty():
-		return false
-	
-	# Coût en mana
-	if ability.has("cost") and ability.cost.has("mana"):
-		if unit_data.get("mana", 0) < ability.cost.mana:
-			return false
-	
-	# Cooldowns → volontairement hors scope ici
-	return true
-
-## Calcule les dégâts d'une capacité
-static func calculate_ability_damage(ability_id: String, unit_stats: Dictionary) -> int:
-	var ability = load_ability(ability_id)
-	if ability.is_empty():
-		return 0
-	
-	var total_damage := 0
-	
-	for effect in ability.get("effects", []):
-		if effect.get("type") != "damage":
-			continue
-		
-		var damage: int = effect.get("base_damage", 0)
-		
-		if effect.has("scaling"):
-			var scaling = effect.scaling
-			var stat_value = unit_stats.get(scaling.get("stat"), 0)
-			var ratio = scaling.get("ratio", 1.0)
-			damage += int(stat_value * ratio)
-		
-		total_damage += damage
-	
-	return total_damage
-
-# ============================================================================
-# CACHE
-# ============================================================================
-
-static func clear_cache() -> void:
-	_ability_cache.clear()
-	print("[AbilityDataLoader] Cache vidé")
+## Valide les champs requis d'une ability
+func validate_ability(data: Dictionary) -> bool:
+	var required = ["id", "name", "type", "cost"]
+	return _json_loader.validate_schema(data, required)

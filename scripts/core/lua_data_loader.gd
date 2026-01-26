@@ -132,8 +132,6 @@ static func load_lua_folder(folder_path: String, use_cache: bool = true) -> Dict
 # ============================================================================
 
 ## Exécute un fichier Lua et retourne le résultat
-# scripts/core/lua_data_loader.gd
-
 static func _execute_lua_file(lua_path: String) -> Variant:
 	var lua = LuaAPI.new()
 	_setup_lua_environment(lua)
@@ -146,55 +144,44 @@ static func _execute_lua_file(lua_path: String) -> Variant:
 	var lua_content = file.get_as_text()
 	file.close()
 	
-	# ✅ DEBUG : Afficher les premières lignes
-	var preview = lua_content.substr(0, 200).replace("\n", " ")
-	print("[LuaDataLoader] 📄 Chargement : ", lua_path)
-	print("[LuaDataLoader] 📄 Preview : ", preview, "...")
+	# ✅ CORRECTION : Toujours wrapper dans une fonction pour capturer le return
+	var wrapped_code = """
+local __temp_result = (function()
+%s
+end)()
+_RESULT = __temp_result
+""" % [lua_content]
 	
-	# Détecter le premier `return`
-	var lines = lua_content.split("\n")
-	var first_code_line_index = -1
-	
-	for i in range(lines.size()):
-		var line = lines[i].strip_edges()
-		if line.is_empty() or line.begins_with("--"):
-			continue
-		first_code_line_index = i
-		break
-	
-	var assignment_code: String
-	
-	if first_code_line_index >= 0:
-		var first_code_line = lines[first_code_line_index].strip_edges()
-		
-		if first_code_line.begins_with("return "):
-			# Wrapper dans une fonction
-			assignment_code = "local __temp_func = function()\n" + lua_content + "\nend\n_RESULT = __temp_func()"
-		else:
-			assignment_code = "_RESULT = " + lua_content
-	else:
-		push_error("[LuaDataLoader] Fichier sans code : ", lua_path)
-		return null
+	# ✅ DEBUG : Afficher le code exécuté
+	if lua_path.contains("campaign_start"):
+		print("[LuaDataLoader] 🔍 Code exécuté :")
+		print(wrapped_code)
 	
 	# Exécuter
-	var error = lua.do_string(assignment_code)
+	var error = lua.do_string(wrapped_code)
 	if error is LuaError:
 		push_error("[LuaDataLoader] ❌ Erreur Lua : ", error.message)
+		push_error("[LuaDataLoader] 📄 Fichier : ", lua_path)
 		return null
 	
 	# Récupérer le résultat
 	var result = lua.pull_variant("_RESULT")
 	
-	# ✅ DEBUG : Afficher le type du résultat
-	print("[LuaDataLoader] 📦 Type récupéré : ", typeof(result))
+	# ✅ DEBUG amélioré
+	print("[LuaDataLoader] 📦 Résultat type : ", typeof(result))
+	if result == null:
+		push_error("[LuaDataLoader] ❌ pull_variant a retourné null")
+		return null
+	
 	if typeof(result) == TYPE_DICTIONARY:
-		print("[LuaDataLoader] 📦 Clés : ", result.keys())
+		print("[LuaDataLoader] 📦 Clés récupérées : ", result.keys())
 	
 	# Nettoyer
 	lua.do_string("_RESULT = nil")
 	
 	return result
-	
+
+
 ## Configure l'environnement Lua standard
 static func _setup_lua_environment(lua: LuaAPI) -> void:
 	# ✅ AJOUT : Activer plus de libs pour supporter les tables complexes
