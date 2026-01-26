@@ -2,11 +2,7 @@
 extends Node
 class_name WorldMapDataLoader
 
-## 🗺️ LOADER SPÉCIALISÉ POUR LES DONNÉES DE WORLD MAP
-## 
-## Charge et valide les données Lua de la carte du monde
-
-const WORLD_MAP_PATH := "res://lua/world_map/"
+const WORLD_MAP_PATH := "res://data/maps/"
 
 static var _map_cache: Dictionary = {}
 static var _location_cache: Dictionary = {}
@@ -17,37 +13,18 @@ static var _location_cache: Dictionary = {}
 
 ## Charge les données complètes de la world map
 static func load_world_map_data(map_id: String = "world_map_data", use_cache: bool = true) -> Dictionary:
-	if use_cache and _map_cache.has(map_id):
-		return _map_cache[map_id]
+	var json_path = WORLD_MAP_PATH + map_id + ".json"
 	
-	var lua_path = WORLD_MAP_PATH + map_id + ".lua"
-	
-	# Charger via LuaDataLoader
-	var raw_data = LuaDataLoader.load_lua_data(lua_path, use_cache, true)
+	var json_loader = JSONDataLoader.new()
+	var raw_data = json_loader.load_json_file(json_path, use_cache)
 	
 	if typeof(raw_data) != TYPE_DICTIONARY or raw_data.is_empty():
-		push_error("[WorldMapDataLoader] ❌ Impossible de charger : ", lua_path)
+		push_error("[WorldMapDataLoader] ❌ Impossible de charger : ", json_path)
 		return {}
 	
-	# Validation
-	var validation = DataValidator.validate_world_map(raw_data, map_id)
+	# Convertir les positions
+	raw_data = _convert_map_positions(raw_data)
 	
-	if not validation.valid:
-		push_error("[WorldMapDataLoader] ❌ Carte invalide : ", map_id)
-		for error in validation.errors:
-			push_error("  - ", error)
-		
-		if LuaDataLoader.validation_mode == LuaDataLoader.ValidationMode.STRICT:
-			return {}
-	
-	# Warnings
-	for warning in validation.warnings:
-		push_warning("[WorldMapDataLoader] ⚠️ ", map_id, " : ", warning)
-	
-	# Mettre en cache
-	_map_cache[map_id] = raw_data
-	
-	print("[WorldMapDataLoader] ✅ Carte chargée : ", map_id, " (", raw_data.get("locations", []).size(), " locations)")
 	return raw_data
 
 # ============================================================================
@@ -56,38 +33,27 @@ static func load_world_map_data(map_id: String = "world_map_data", use_cache: bo
 
 ## Charge les données d'une location spécifique
 static func load_location_data(location_id: String, use_cache: bool = true) -> Dictionary:
-	if use_cache and _location_cache.has(location_id):
-		return _location_cache[location_id]
+	var json_path = WORLD_MAP_PATH + "locations/" + location_id + ".json"
 	
-	var lua_path = WORLD_MAP_PATH + "locations/" + location_id + ".lua"
-	
-	# Charger via LuaDataLoader
-	var raw_data = LuaDataLoader.load_lua_data(lua_path, use_cache, true)
+	var json_loader = JSONDataLoader.new()
+	var raw_data = json_loader.load_json_file(json_path, use_cache)
 	
 	if typeof(raw_data) != TYPE_DICTIONARY or raw_data.is_empty():
-		push_error("[WorldMapDataLoader] ❌ Impossible de charger location : ", lua_path)
+		push_error("[WorldMapDataLoader] ❌ Impossible de charger location : ", json_path)
 		return {}
 	
-	# Validation
-	var validation = DataValidator.validate_world_map_location(raw_data, location_id)
-	
-	if not validation.valid:
-		push_error("[WorldMapDataLoader] ❌ Location invalide : ", location_id)
-		for error in validation.errors:
-			push_error("  - ", error)
-		
-		if LuaDataLoader.validation_mode == LuaDataLoader.ValidationMode.STRICT:
-			return {}
-	
-	# Warnings
-	for warning in validation.warnings:
-		push_warning("[WorldMapDataLoader] ⚠️ ", location_id, " : ", warning)
-	
-	# Mettre en cache
-	_location_cache[location_id] = raw_data
-	
-	print("[WorldMapDataLoader] ✅ Location chargée : ", location_id)
 	return raw_data
+
+static func _convert_map_positions(data: Dictionary) -> Dictionary:
+	var result = data.duplicate(true)
+	
+	if result.has("locations"):
+		for location in result.locations:
+			if location.has("position"):
+				var pos = location.position
+				location.position = Vector2i(pos.x, pos.y)
+	
+	return result
 
 # ============================================================================
 # QUERIES

@@ -38,44 +38,22 @@ func _ready() -> void:
 # CHARGEMENT DEPUIS LUA
 # ============================================================================
 func _load_campaign_start_data() -> void:
-	"""Charge le fichier campaign_start.lua"""
+	# ✅ Charger depuis JSON
+	var json_path = "res://data/campaign/campaign_start.json"
 	
-	var lua_path = "res://lua/campaign/campaign_start.lua"
-	
-	# ✅ Vérification 1 : Fichier existe
-	if not FileAccess.file_exists(lua_path):
-		push_error("[IntroDialogue] ❌ Fichier introuvable : ", lua_path)
+	if not FileAccess.file_exists(json_path):
+		push_error("[IntroDialogue] ❌ Fichier introuvable : ", json_path)
 		return
 	
-	print("[IntroDialogue] ✅ Fichier trouvé : ", lua_path)
+	var json_loader = JSONDataLoader.new()
+	campaign_start_data = json_loader.load_json_file(json_path)
 	
-	# ✅ Vérification 2 : Contenu lisible
-	var file = FileAccess.open(lua_path, FileAccess.READ)
-	var content = file.get_as_text()
-	file.close()
-	
-	print("[IntroDialogue] 📄 Taille du fichier : ", content.length(), " caractères")
-	print("[IntroDialogue] 📄 Premières lignes :")
-	var lines = content.split("\n")
-	for i in range(min(5, lines.size())):
-		print("  ", i, ": ", lines[i])
-	
-	# ✅ Vérification 3 : Chargement Lua
-	campaign_start_data = LuaDataLoader.load_lua_data(lua_path, false, true)
-	
-	print("[IntroDialogue] 📦 Type retourné : ", typeof(campaign_start_data))
-	
-	if typeof(campaign_start_data) != TYPE_DICTIONARY:
-		push_error("[IntroDialogue] ❌ Type invalide, attendu Dictionary")
+	if typeof(campaign_start_data) != TYPE_DICTIONARY or campaign_start_data.is_empty():
+		push_error("[IntroDialogue] ❌ Données invalides")
 		return
 	
-	if campaign_start_data.is_empty():
-		push_error("[IntroDialogue] ❌ Dictionary vide après chargement")
-		return
+	print("[IntroDialogue] ✅ Données chargées : ", campaign_start_data.keys())
 	
-	print("[IntroDialogue] ✅ Clés chargées : ", campaign_start_data.keys())
-
-
 # ============================================================================
 # EXÉCUTION DE LA SÉQUENCE
 # ============================================================================

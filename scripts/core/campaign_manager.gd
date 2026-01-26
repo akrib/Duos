@@ -15,10 +15,10 @@ var campaign_state: Dictionary = {
 
 # ✅ Chemins vers les fichiers Lua de données
 const BATTLE_DATA_PATHS: Dictionary = {
-	"tutorial": "res://lua/battle_data/tutorial.lua",
-	"forest_battle": "res://lua/battle_data/forest_battle.lua",
-	"village_defense": "res://lua/battle_data/village_defense.lua",
-	"boss_fight": "res://lua/battle_data/boss_fight.lua"
+	"tutorial": "res://data/battles/tutorial.json",
+	"forest_battle": "res://data/battles/forest_battle.json",
+	"village_defense": "res://data/battles/village_defense.json",
+	"boss_fight": "res://data/battles/boss_fight.json"
 }
 
 func _ready() -> void:
@@ -27,110 +27,58 @@ func _ready() -> void:
 	print("[CampaignManager] Initialisé (mode Lua)")
 
 ## Démarrer un combat en chargeant ses données depuis Lua
-# ✅ APRÈS
 func start_battle(battle_id: String) -> void:
-	"""Démarre un combat en chargeant et validant ses données"""
 	print("[CampaignManager] 🎯 Chargement du combat : ", battle_id)
 	
-	# 1. Charger les données depuis Lua
-	var battle_data = load_battle_data_from_lua(battle_id)
+	# ✅ Charger depuis JSON au lieu de Lua
+	var battle_data = load_battle_data_from_json(battle_id)
 	
 	if battle_data.is_empty():
 		push_error("[CampaignManager] Impossible de charger : ", battle_id)
 		return
 	
-	# 2. Ajouter un ID unique d'instance
+	# Le reste identique...
 	battle_data["battle_id"] = battle_id + "_" + str(Time.get_unix_time_from_system())
-	
-	# 3. ✅ STOCKER dans BattleDataManager
 	var stored = BattleDataManager.set_battle_data(battle_data)
-	
-	if not stored:
-		push_error("[CampaignManager] ❌ Données de combat invalides pour : ", battle_id)
-		return
-		
-	# 4. Émettre les signaux
-	battle_started.emit(battle_id)
-	EventBus.start_battle(battle_data["battle_id"])  # ✅ Juste l'ID
-	
-	# 5. Changer de scène
-	EventBus.change_scene(SceneRegistry.SceneID.BATTLE)
 
 ## Charge un fichier Lua de données de combat
-# scripts/core/campaign_manager.gd
-
-## Charge un fichier Lua de données de combat
-func load_battle_data_from_lua(battle_id: String) -> Dictionary:
+func load_battle_data_from_json(battle_id: String) -> Dictionary:
 	if not BATTLE_DATA_PATHS.has(battle_id):
 		push_error("[CampaignManager] Battle ID inconnu : ", battle_id)
 		return {}
 	
-	var lua_path = BATTLE_DATA_PATHS[battle_id]
-	
-	# ✅ Charger avec conversion automatique
-	var battle_data = LuaDataLoader.load_lua_data(lua_path, true, true)
+	var json_path = BATTLE_DATA_PATHS[battle_id]
+	var json_loader = JSONDataLoader.new()
+	var battle_data = json_loader.load_json_file(json_path)
 	
 	if typeof(battle_data) != TYPE_DICTIONARY or battle_data.is_empty():
 		push_error("[CampaignManager] Impossible de charger : ", battle_id)
 		return {}
 	
-	# ✅ DEBUG : Afficher les clés chargées
-	print("[CampaignManager] 📦 Clés chargées : ", battle_data.keys())
-	print("[CampaignManager] 📦 player_units type : ", typeof(battle_data.get("player_units")))
-	print("[CampaignManager] 📦 enemy_units type : ", typeof(battle_data.get("enemy_units")))
-	
-	# ✅ SUPPRIMÉ : Pas de double conversion, LuaDataLoader s'en charge déjà
-	# return _convert_lua_to_godot(battle_data)
-	
-	# ✅ NOUVEAU : Vérification de sécurité
-	if not battle_data.has("player_units"):
-		push_error("[CampaignManager] ❌ Pas de player_units dans : ", battle_id)
-		return {}
-	
-	if not battle_data.has("enemy_units"):
-		push_error("[CampaignManager] ❌ Pas de enemy_units dans : ", battle_id)
-		return {}
-	
-	if typeof(battle_data.player_units) != TYPE_ARRAY:
-		push_error("[CampaignManager] ❌ player_units n'est pas un Array : ", typeof(battle_data.player_units))
-		return {}
-	
-	if typeof(battle_data.enemy_units) != TYPE_ARRAY:
-		push_error("[CampaignManager] ❌ enemy_units n'est pas un Array : ", typeof(battle_data.enemy_units))
-		return {}
-	
-	print("[CampaignManager] ✅ Données valides : ", battle_data.player_units.size(), " joueurs, ", battle_data.enemy_units.size(), " ennemis")
+	# Convertir position {x, y} → Vector2i
+	battle_data = _convert_json_positions(battle_data)
 	
 	return battle_data
 
-
-
-## Convertit les données Lua en format Godot compatible
-func _convert_lua_to_godot(lua_data: Dictionary) -> Dictionary:
-	var result = lua_data.duplicate(true)
+func _convert_json_positions(data: Dictionary) -> Dictionary:
+	var result = data.duplicate(true)
 	
-	# Convertir les positions {x=3, y=7} en Vector2i
+	# Player units
 	if result.has("player_units"):
 		for unit in result.player_units:
 			if unit.has("position"):
 				var pos = unit.position
 				unit.position = Vector2i(pos.x, pos.y)
-			
-			if unit.has("color"):
-				var c = unit.color
-				unit.color = Color(c.r, c.g, c.b, c.get("a", 1.0))
 	
+	# Enemy units
 	if result.has("enemy_units"):
 		for unit in result.enemy_units:
 			if unit.has("position"):
 				var pos = unit.position
 				unit.position = Vector2i(pos.x, pos.y)
-			
-			if unit.has("color"):
-				var c = unit.color
-				unit.color = Color(c.r, c.g, c.b, c.get("a", 1.0))
 	
 	return result
+
 
 func _on_battle_ended(results: Dictionary) -> void:
 	print("[CampaignManager] Combat terminé")
