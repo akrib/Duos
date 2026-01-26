@@ -60,9 +60,10 @@ func setup(data: Dictionary) -> void:
 func _create_visuals() -> void:
 	"""Crée les éléments visuels"""
 	
-	# Sprite principal
+	# Sprite principal avec texture de rond jaune
 	sprite = Sprite2D.new()
 	sprite.centered = true
+	sprite.texture = _create_yellow_circle_texture()  # ✅ NOUVEAU
 	add_child(sprite)
 	
 	# Label avec le nom
@@ -87,27 +88,61 @@ func _create_visuals() -> void:
 	area.mouse_entered.connect(_on_mouse_entered)
 	area.mouse_exited.connect(_on_mouse_exited)
 
+# ✅ NOUVELLE FONCTION : Créer un rond jaune programmatiquement
+func _create_yellow_circle_texture() -> ImageTexture:
+	"""Crée une texture de cercle jaune"""
+	var size = 64
+	var image = Image.create(size, size, false, Image.FORMAT_RGBA8)
+	image.fill(Color.TRANSPARENT)
+	
+	var center = size / 2
+	var radius = 28
+	
+	# Dessiner le cercle jaune
+	for y in range(size):
+		for x in range(size):
+			var dx = x - center
+			var dy = y - center
+			var dist = sqrt(dx*dx + dy*dy)
+			
+			if dist < radius:
+				# Dégradé du centre vers les bords
+				var alpha = 1.0 - (dist / radius) * 0.3
+				image.set_pixel(x, y, Color(1.0, 0.9, 0.2, alpha))
+			
+			# Contour plus foncé
+			if dist >= radius - 3 and dist < radius:
+				image.set_pixel(x, y, Color(0.8, 0.7, 0.0, 1.0))
+	
+	return ImageTexture.create_from_image(image)
+
 func _update_visuals() -> void:
 	"""Met à jour l'apparence selon l'état"""
 	
-	# ✅ PROTECTION: Vérifier que les visuels existent
 	if not sprite or not label or not area:
 		push_warning("[WorldMapLocation] Visuels non initialisés pour: ", location_name)
 		return
 	
-	# Texture
-	var icon_path = location_data.get("icon", "res://icon.svg")
-	if ResourceLoader.exists(icon_path):
+	# ✅ CHANGEMENT : Utiliser un rond jaune par défaut
+	var icon_path = location_data.get("icon", "")
+	
+	if icon_path != "" and ResourceLoader.exists(icon_path):
 		sprite.texture = load(icon_path)
+	else:
+		# Pas d'icône spécifiée → utiliser le rond jaune
+		sprite.texture = _create_yellow_circle_texture()
 	
 	# Scale
-	var scale_value = location_data.get("scale", 1.0)
+	var scale_value = location_data.get("scale", 1.5)  # ✅ Un peu plus grand par défaut
 	sprite.scale = Vector2(scale_value, scale_value)
 	
-	# Couleur
+	# Couleur (si spécifiée dans les données)
 	if location_data.has("color"):
 		var c = location_data.color
 		sprite.modulate = Color(c.get("r", 1), c.get("g", 1), c.get("b", 1), c.get("a", 1))
+	else:
+		# ✅ Jaune par défaut
+		sprite.modulate = Color(1.0, 0.9, 0.2, 1.0)
 	
 	# Nom
 	label.text = location_name
@@ -117,7 +152,7 @@ func _update_visuals() -> void:
 	
 	# Effet hover
 	if is_hovered:
-		sprite.scale *= 1.1
+		sprite.scale *= 1.2  # ✅ Plus gros au survol
 		label.add_theme_color_override("font_color", Color.YELLOW)
 	else:
 		label.add_theme_color_override("font_color", Color.WHITE)

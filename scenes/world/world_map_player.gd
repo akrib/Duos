@@ -13,6 +13,7 @@ signal movement_completed()
 
 @export var bounce_speed: float = 1.5
 @export var bounce_amount: float = 10.0
+@export var bounce_offset: float = 75.0 
 @export var scale_variation: float = 0.1  # Variation de scale pour l'effet respiration
 @export var move_speed: float = 300.0
 
@@ -72,22 +73,29 @@ func _start_bounce_animation() -> void:
 	bounce_tween.set_loops()
 	bounce_tween.set_parallel(true)
 	
+	# ✅ CHANGEMENT : Bounce entre -bounce_amount-bounce_offset et -bounce_offset
+	# (au lieu de -bounce_amount à 0)
+	# Cela place le sprite plus haut de façon permanente
+	
+	var min_y = -bounce_offset  # Position basse du bounce
+	var max_y = -bounce_offset - bounce_amount  # Position haute du bounce
+	
 	# Variation de position Y (bounce)
 	bounce_tween.tween_property(
 		sprite,
 		"position:y",
-		-bounce_amount,
+		max_y,
 		bounce_speed / 2.0
 	).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 	
 	bounce_tween.tween_property(
 		sprite,
 		"position:y",
-		0,
+		min_y,
 		bounce_speed / 2.0
 	).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE).set_delay(bounce_speed / 2.0)
 	
-	# Variation de scale (respiration)
+	# Variation de scale (respiration) - inchangé
 	var base_scale = sprite.scale
 	var scale_min = base_scale * (1.0 - scale_variation)
 	var scale_max = base_scale * (1.0 + scale_variation)

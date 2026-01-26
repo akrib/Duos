@@ -336,7 +336,7 @@ func _start_player_turn() -> void:
 	print("[BattleMapManager3D] === Tour ", current_turn, " - JOUEUR ===")
 	turn_label.text = "Tour " + str(current_turn)
 	unit_manager.reset_player_units()
-	lua_scenario_module.trigger_turn_event(current_turn, false)
+	json_scenario_module.trigger_turn_event(current_turn, false)
 	set_process_input(true)
 
 func _end_player_turn() -> void:
@@ -352,7 +352,7 @@ func _end_player_turn() -> void:
 func _start_enemy_turn() -> void:
 	print("[BattleMapManager3D] === Tour ", current_turn, " - ENNEMI ===")
 	unit_manager.reset_enemy_units()
-	lua_scenario_module.trigger_turn_event(current_turn, false)
+	json_scenario_module.trigger_turn_event(current_turn, false)
 	await ai_module.execute_enemy_turn()
 	_end_enemy_turn()
 
@@ -752,7 +752,7 @@ func _on_unit_died(unit: BattleUnit3D) -> void:
 	_check_battle_end()
 
 func _on_unit_moved(unit: BattleUnit3D, from: Vector2i, to: Vector2i) -> void:
-	lua_scenario_module.trigger_position_event(unit, to)
+	json_scenario_module.trigger_position_event(unit, to)
 	objective_module.check_position_objectives(unit, to)
 
 func _on_objective_completed(objective_id: String) -> void:
@@ -778,9 +778,9 @@ func _check_battle_end() -> void:
 func _end_battle(victory: bool) -> void:
 	is_battle_active = false
 	
-	if lua_scenario_module.has_outro():
+	if json_scenario_module.has_outro():
 		change_phase(TurnPhase.CUTSCENE)
-		await lua_scenario_module.play_outro(victory)
+		await json_scenario_module.play_outro(victory)
 	
 	var battle_stats = stats_tracker.get_final_stats()
 	var results = {

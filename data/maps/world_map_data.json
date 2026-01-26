@@ -1,7 +1,6 @@
 {
   "id": "main_world",
   "name": "Continent de Terramia",
-  "description": "Le monde principal du jeu",
   "grid_size": {
 	"width": 1920,
 	"height": 1080
@@ -53,10 +52,16 @@
 	}
   ],
   "connections_visual": {
-	"color": {"r": 0.7, "g": 0.7, "b": 0.7, "a": 0.6},
-	"color_locked": {"r": 0.3, "g": 0.3, "b": 0.3, "a": 0.3},
-	"width": 3.0,
-	"dash_length": 10.0
+	"color": {"r": 0.7, "g": 0.7, "b": 0.7, "a": 0.8},
+	"color_locked": {"r": 0.3, "g": 0.3, "b": 0.3, "a": 0.4},
+	"width": 5.0,
+	"dash_length": 20.0,
+	"gap_length": 12.0
+  },
+  "connection_states": {
+	"starting_village_to_dark_forest": "unlocked",
+	"dark_forest_to_capital_city": "locked",
+	"capital_city_to_eastern_port": "hidden"
   },
   "player": {
 	"start_location": "starting_village",

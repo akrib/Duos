@@ -30,6 +30,8 @@ class_name WorldMap
 var world_map_data: Dictionary = {}
 var locations: Dictionary = {}  # location_id -> WorldMapLocation
 var player: WorldMapPlayer = null
+# Ajouter une variable pour stocker les connexions
+var connections: Dictionary = {}  # connection_id -> WorldMapConnection
 
 # ============================================================================
 # ÉTAT
@@ -160,58 +162,141 @@ func _create_locations() -> void:
 		locations_container.add_child(location)
 		locations[location_data.id] = location
 
+# Dans world_map.gd, remplacer la fonction _create_connections()
+
+# ============================================================================
+# GÉNÉRATION DE LA CARTE (MODIFIÉ)
+# ============================================================================
+
+
+
 func _create_connections() -> void:
-	"""Crée les lignes entre les locations"""
+	"""Crée les connexions entre locations avec états"""
 	
 	var visual_config = world_map_data.get("connections_visual", {})
-	var line_color = Color(0.7, 0.7, 0.7, 0.6)
-	var line_color_locked = Color(0.3, 0.3, 0.3, 0.3)
-	var line_width = 3.0
 	
+	# Configuration depuis JSON
+	if visual_config.has("width"):
+		WorldMapConnection.line_width = visual_config.width
+	if visual_config.has("dash_length"):
+		WorldMapConnection.dash_length = visual_config.dash_length
+	
+	# Couleurs
 	if visual_config.has("color"):
 		var c = visual_config.color
-		line_color = Color(c.get("r", 0.7), c.get("g", 0.7), c.get("b", 0.7), c.get("a", 0.6))
+		WorldMapConnection.color_unlocked = Color(c.get("r", 0.7), c.get("g", 0.7), c.get("b", 0.7), c.get("a", 0.8))
 	
 	if visual_config.has("color_locked"):
 		var c = visual_config.color_locked
-		line_color_locked = Color(c.get("r", 0.3), c.get("g", 0.3), c.get("b", 0.3), c.get("a", 0.3))
+		WorldMapConnection.color_locked = Color(c.get("r", 0.3), c.get("g", 0.3), c.get("b", 0.3), c.get("a", 0.4))
 	
-	if visual_config.has("width"):
-		line_width = visual_config.width
+	# Charger les états des connexions depuis les données
+	var connection_states = world_map_data.get("connection_states", {})
 	
 	# Parcourir toutes les locations
 	for location_id in locations:
 		var location = locations[location_id]
-		var connections = location.get_connections()
+		var location_connections = location.get_connections()
 		
-		for target_id in connections:
+		for target_id in location_connections:
 			if not locations.has(target_id):
 				continue
 			
 			var target_location = locations[target_id]
 			
 			# Ne créer qu'une seule ligne par paire (éviter doublons)
-			if location_id > target_id:
+			var connection_id = _get_connection_id(location_id, target_id)
+			if connections.has(connection_id):
 				continue
 			
-			# Créer la ligne
-			var line = Line2D.new()
-			line.add_point(location.position)
-			line.add_point(target_location.position)
-			line.width = line_width
+			# Créer la connexion
+			var connection = WorldMapConnection.new()
 			
-			# Couleur selon si les deux locations sont déverrouillées
-			if location.is_unlocked and target_location.is_unlocked:
-				line.default_color = line_color
-			else:
-				line.default_color = line_color_locked
+			# Déterminer l'état initial
+			var initial_state = _get_connection_state(location_id, target_id, connection_states)
 			
-			# Pointillés
-			if visual_config.has("dash_length"):
-				line.default_color.a *= 0.8  # Un peu plus transparent
+			connection.setup(location, target_location, initial_state)
 			
-			connections_container.add_child(line)
+			connections_container.add_child(connection)
+			connections[connection_id] = connection
+	
+	print("[WorldMap] ✅ ", connections.size(), " connexions créées")
 
+# ============================================================================
+# HELPERS POUR LES CONNEXIONS
+# ============================================================================
+
+func _get_connection_id(from_id: String, to_id: String) -> String:
+	"""Génère un ID unique pour une paire de locations (ordre alphabétique)"""
+	var ids = [from_id, to_id]
+	ids.sort()
+	return ids[0] + "_to_" + ids[1]
+
+func _get_connection_state(from_id: String, to_id: String, states: Dictionary) -> WorldMapConnection.ConnectionState:
+	"""Détermine l'état d'une connexion depuis les données"""
+	
+	var connection_id = _get_connection_id(from_id, to_id)
+	
+	# Vérifier si un état spécifique est défini
+	if states.has(connection_id):
+		var state_str = states[connection_id]
+		match state_str:
+			"unlocked":
+				return WorldMapConnection.ConnectionState.UNLOCKED
+			"locked":
+				return WorldMapConnection.ConnectionState.LOCKED
+			"hidden":
+				return WorldMapConnection.ConnectionState.HIDDEN
+	
+	# Par défaut : déverrouillé si les deux locations sont déverrouillées
+	var from_loc = locations.get(from_id)
+	var to_loc = locations.get(to_id)
+	
+	if from_loc and to_loc and from_loc.is_unlocked and to_loc.is_unlocked:
+		return WorldMapConnection.ConnectionState.UNLOCKED
+	
+	# Sinon : caché par défaut
+	return WorldMapConnection.ConnectionState.HIDDEN
+
+# ============================================================================
+# API PUBLIQUE POUR CONTRÔLER LES CONNEXIONS
+# ============================================================================
+
+func unlock_connection(from_id: String, to_id: String) -> void:
+	"""Déverrouille une connexion"""
+	var connection_id = _get_connection_id(from_id, to_id)
+	
+	if connections.has(connection_id):
+		connections[connection_id].unlock()
+		print("[WorldMap] 🔓 Connexion déverrouillée : ", connection_id)
+
+func lock_connection(from_id: String, to_id: String) -> void:
+	"""Verrouille une connexion (la rend visible mais bloquée)"""
+	var connection_id = _get_connection_id(from_id, to_id)
+	
+	if connections.has(connection_id):
+		connections[connection_id].lock()
+		print("[WorldMap] 🔒 Connexion verrouillée : ", connection_id)
+
+func hide_connection(from_id: String, to_id: String) -> void:
+	"""Cache une connexion complètement"""
+	var connection_id = _get_connection_id(from_id, to_id)
+	
+	if connections.has(connection_id):
+		connections[connection_id].hide_connection()
+		print("[WorldMap] 👁️ Connexion cachée : ", connection_id)
+
+func reveal_connection(from_id: String, to_id: String, locked: bool = true) -> void:
+	"""Révèle une connexion cachée (verrouillée par défaut)"""
+	var connection_id = _get_connection_id(from_id, to_id)
+	
+	if connections.has(connection_id):
+		if locked:
+			connections[connection_id].lock()
+		else:
+			connections[connection_id].unlock()
+		print("[WorldMap] 🔍 Connexion révélée : ", connection_id)
+		
 # ============================================================================
 # JOUEUR
 # ============================================================================
