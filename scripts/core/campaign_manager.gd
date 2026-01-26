@@ -57,6 +57,9 @@ func start_battle(battle_id: String) -> void:
 	EventBus.change_scene(SceneRegistry.SceneID.BATTLE)
 
 ## Charge un fichier Lua de données de combat
+# scripts/core/campaign_manager.gd
+
+## Charge un fichier Lua de données de combat
 func load_battle_data_from_lua(battle_id: String) -> Dictionary:
 	if not BATTLE_DATA_PATHS.has(battle_id):
 		push_error("[CampaignManager] Battle ID inconnu : ", battle_id)
@@ -64,15 +67,43 @@ func load_battle_data_from_lua(battle_id: String) -> Dictionary:
 	
 	var lua_path = BATTLE_DATA_PATHS[battle_id]
 	
-	# ✅ CORRECTION : Utiliser LuaDataLoader
+	# ✅ Charger avec conversion automatique
 	var battle_data = LuaDataLoader.load_lua_data(lua_path, true, true)
 	
 	if typeof(battle_data) != TYPE_DICTIONARY or battle_data.is_empty():
 		push_error("[CampaignManager] Impossible de charger : ", battle_id)
 		return {}
 	
-	# Convertir les données Lua en format Godot
-	return _convert_lua_to_godot(battle_data)
+	# ✅ DEBUG : Afficher les clés chargées
+	print("[CampaignManager] 📦 Clés chargées : ", battle_data.keys())
+	print("[CampaignManager] 📦 player_units type : ", typeof(battle_data.get("player_units")))
+	print("[CampaignManager] 📦 enemy_units type : ", typeof(battle_data.get("enemy_units")))
+	
+	# ✅ SUPPRIMÉ : Pas de double conversion, LuaDataLoader s'en charge déjà
+	# return _convert_lua_to_godot(battle_data)
+	
+	# ✅ NOUVEAU : Vérification de sécurité
+	if not battle_data.has("player_units"):
+		push_error("[CampaignManager] ❌ Pas de player_units dans : ", battle_id)
+		return {}
+	
+	if not battle_data.has("enemy_units"):
+		push_error("[CampaignManager] ❌ Pas de enemy_units dans : ", battle_id)
+		return {}
+	
+	if typeof(battle_data.player_units) != TYPE_ARRAY:
+		push_error("[CampaignManager] ❌ player_units n'est pas un Array : ", typeof(battle_data.player_units))
+		return {}
+	
+	if typeof(battle_data.enemy_units) != TYPE_ARRAY:
+		push_error("[CampaignManager] ❌ enemy_units n'est pas un Array : ", typeof(battle_data.enemy_units))
+		return {}
+	
+	print("[CampaignManager] ✅ Données valides : ", battle_data.player_units.size(), " joueurs, ", battle_data.enemy_units.size(), " ennemis")
+	
+	return battle_data
+
+
 
 ## Convertit les données Lua en format Godot compatible
 func _convert_lua_to_godot(lua_data: Dictionary) -> Dictionary:

@@ -146,13 +146,17 @@ static func _execute_lua_file(lua_path: String) -> Variant:
 	var lua_content = file.get_as_text()
 	file.close()
 	
-	# ✅ CORRECTION : Détecter le premier `return` en ignorant les commentaires
+	# ✅ DEBUG : Afficher les premières lignes
+	var preview = lua_content.substr(0, 200).replace("\n", " ")
+	print("[LuaDataLoader] 📄 Chargement : ", lua_path)
+	print("[LuaDataLoader] 📄 Preview : ", preview, "...")
+	
+	# Détecter le premier `return`
 	var lines = lua_content.split("\n")
 	var first_code_line_index = -1
 	
 	for i in range(lines.size()):
 		var line = lines[i].strip_edges()
-		# Ignorer lignes vides et commentaires
 		if line.is_empty() or line.begins_with("--"):
 			continue
 		first_code_line_index = i
@@ -160,47 +164,57 @@ static func _execute_lua_file(lua_path: String) -> Variant:
 	
 	var assignment_code: String
 	
-	# Vérifier si le premier code est un return
 	if first_code_line_index >= 0:
 		var first_code_line = lines[first_code_line_index].strip_edges()
 		
 		if first_code_line.begins_with("return "):
-			# ✅ WRAPPER dans une fonction pour capturer le return
+			# Wrapper dans une fonction
 			assignment_code = "local __temp_func = function()\n" + lua_content + "\nend\n_RESULT = __temp_func()"
 		else:
-			# Pas de return, assigner directement
 			assignment_code = "_RESULT = " + lua_content
 	else:
-		# Fichier vide ou que des commentaires
 		push_error("[LuaDataLoader] Fichier sans code : ", lua_path)
 		return null
 	
 	# Exécuter
 	var error = lua.do_string(assignment_code)
 	if error is LuaError:
-		push_error("[LuaDataLoader] Erreur Lua dans ", lua_path, " : ", error.message)
+		push_error("[LuaDataLoader] ❌ Erreur Lua : ", error.message)
 		return null
 	
 	# Récupérer le résultat
 	var result = lua.pull_variant("_RESULT")
 	
+	# ✅ DEBUG : Afficher le type du résultat
+	print("[LuaDataLoader] 📦 Type récupéré : ", typeof(result))
+	if typeof(result) == TYPE_DICTIONARY:
+		print("[LuaDataLoader] 📦 Clés : ", result.keys())
+	
 	# Nettoyer
 	lua.do_string("_RESULT = nil")
 	
 	return result
-
-
+	
 ## Configure l'environnement Lua standard
 static func _setup_lua_environment(lua: LuaAPI) -> void:
-	# Bibliothèques de base
-	lua.bind_libraries(["base", "table", "string", "math"])
+	# ✅ AJOUT : Activer plus de libs pour supporter les tables complexes
+	lua.bind_libraries(["base", "table", "string", "math", "coroutine"])
 	
 	# Exposer les types Godot utiles
 	lua.push_variant("Vector2i", func(x, y): return Vector2i(x, y))
 	lua.push_variant("Color", func(r, g, b, a=1.0): return Color(r, g, b, a))
+	
+	# ✅ AJOUT : Fonction de debug Lua
+	lua.push_variant("godot_print", func(msg): print("[Lua] ", msg))
 
 # ============================================================================
 # CONVERSION DE TYPES
+# ============================================================================
+
+# scripts/core/lua_data_loader.gd
+
+# ============================================================================
+# CONVERSION DE TYPES (CORRIGÉE)
 # ============================================================================
 
 ## Convertit récursivement les données Lua en types Godot
@@ -209,7 +223,7 @@ static func _convert_lua_to_godot(data: Variant) -> Variant:
 		TYPE_DICTIONARY:
 			return _convert_dict(data)
 		TYPE_ARRAY:
-			return _convert_array(data)
+			return _convert_array(data)  # ✅ DÉJÀ EXISTANT
 		_:
 			return data
 
@@ -220,10 +234,10 @@ static func _convert_dict(dict: Dictionary) -> Dictionary:
 	for key in dict:
 		var value = dict[key]
 		
-		# Convertir les valeurs récursivement
+		# ✅ CORRECTION : Convertir les valeurs récursivement (Arrays inclus)
 		result[key] = _convert_lua_to_godot(value)
 	
-	# Conversions spéciales
+	# ✅ Conversions spéciales APRÈS avoir traité les enfants
 	result = _apply_special_conversions(result)
 	
 	return result
@@ -233,7 +247,7 @@ static func _convert_array(arr: Array) -> Array:
 	var result = []
 	
 	for item in arr:
-		result.append(_convert_lua_to_godot(item))
+		result.append(_convert_lua_to_godot(item))  # ✅ Récursion
 	
 	return result
 
@@ -253,13 +267,9 @@ static func _apply_special_conversions(dict: Dictionary) -> Variant:
 			dict.get("a", 1.0)
 		)
 	
-	# Conversion des sous-dictionnaires
-	for key in dict:
-		if typeof(dict[key]) == TYPE_DICTIONARY:
-			dict[key] = _apply_special_conversions(dict[key])
-	
+	# ✅ PAS besoin de récursion ici, elle est déjà faite dans _convert_dict
 	return dict
-
+	
 # ============================================================================
 # UTILITAIRES
 # ============================================================================

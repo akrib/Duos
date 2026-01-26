@@ -1,53 +1,43 @@
 return {
-    campaign_id = "main_campaign",
+    metadata = {
+        id = "chapter_1",
+        name = "Chapitre 1 : Le Réveil"
+    },
     
     start_sequence = {
+        {type = "dialogue", character = "narrator", text = "Votre aventure commence..."},
+        {type = "start_combat", combat_id = "fight_1"}
+    },
+    
+    combats = {
+        -- Combat 1 : Tutorial
         {
-            speaker = "Narrateur",
-            text = "Texte du premier dialogue..."
+            id = "fight_1",
+            enemy_team = {{unit_id = "slime_01", type = "slime", level = 1, position = {x = 5, y = 3}}},
+            player_team = {starting_positions = {{x = 1, y = 3}}},
+            victory_conditions = {type = "eliminate_all"},
+            on_victory = {{type = "start_combat", combat_id = "fight_2"}}
         },
+        
+        -- Combat 2 : Intermédiaire
         {
-            speaker = "Personnage",
-            text = "Autre dialogue..."
+            id = "fight_2",
+            enemy_team = {
+                {unit_id = "goblin_01", type = "goblin", level = 2, position = {x = 5, y = 2}},
+                {unit_id = "goblin_02", type = "goblin", level = 2, position = {x = 5, y = 4}}
+            },
+            player_team = {starting_positions = {{x = 1, y = 3}}},
+            victory_conditions = {type = "eliminate_all"},
+            on_victory = {{type = "start_combat", combat_id = "fight_3"}}
         },
+        
+        -- Combat 3 : Boss
         {
-            type = "dialogue",
-            dialogue_id = "intro",  -- Référence au fichier lua/dialogues/intro.lua
-            blocking = true  -- Bloque jusqu'à la fin du dialogue
-        },
-        {
-            type = "transition",
-            target = "world_map",
-            fade_duration = 1.0
-        },
-        {
-            type = "notification",
-            message = "Bienvenue dans le royaume de Valoria",
-            duration = 3.0
-        },
-        {
-            type = "unlock_location",
-            location = "castle"
-        },
-        {
-            type = "unlock_location",
-            location = "forest_battle"
+            id = "fight_3",
+            enemy_team = {{unit_id = "boss_orc", type = "orc_chief", level = 5, position = {x = 6, y = 3}}},
+            player_team = {starting_positions = {{x = 1, y = 3}}},
+            victory_conditions = {type = "eliminate_all"},
+            on_victory = {{type = "dialogue", character = "hero", text = "Chapitre terminé !"}}
         }
-    },
-    
-    -- État initial de la campagne
-    initial_state = {
-        chapter = 1,
-        battle_index = 0,
-        battles_won = 0,
-        locations_unlocked = {},
-        flags = {}
-    },
-    
-    -- Métadonnées
-    metadata = {
-        name = "La Menace de la Forêt Noire",
-        description = "Le royaume est en danger...",
-        difficulty = "normal"
     }
 }

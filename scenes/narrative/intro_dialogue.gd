@@ -47,12 +47,24 @@ func _load_campaign_start_data() -> void:
 		push_error("[IntroDialogue] Fichier introuvable : ", lua_path)
 		return
 	
-	# ✅ CORRECTION : Utiliser LuaDataLoader au lieu de faire manuellement
+	# Charger via LuaDataLoader
 	campaign_start_data = LuaDataLoader.load_lua_data(lua_path, false, true)
+	
+	# ✅ DEBUG : Afficher le contenu complet
+	print("[IntroDialogue] 📦 Type de données : ", typeof(campaign_start_data))
+	print("[IntroDialogue] 📦 Données brutes : ", campaign_start_data)
+	print("[IntroDialogue] 📦 Clés disponibles : ", campaign_start_data.keys() if typeof(campaign_start_data) == TYPE_DICTIONARY else "N/A")
 	
 	if typeof(campaign_start_data) != TYPE_DICTIONARY or campaign_start_data.is_empty():
 		push_error("[IntroDialogue] Impossible de charger campaign_start.lua")
 		return
+	
+	# ✅ DEBUG : Vérifier start_sequence
+	if campaign_start_data.has("start_sequence"):
+		print("[IntroDialogue] ✅ start_sequence trouvée (", campaign_start_data.start_sequence.size(), " étapes)")
+	else:
+		push_error("[IntroDialogue] ❌ start_sequence MANQUANTE !")
+		print("[IntroDialogue] Clés présentes : ", campaign_start_data.keys())
 	
 	print("[IntroDialogue] ✅ campaign_start.lua chargé : ", campaign_start_data.get("campaign_id"))
 
@@ -65,8 +77,10 @@ func _execute_start_sequence() -> void:
 	
 	if not campaign_start_data.has("start_sequence"):
 		push_error("[IntroDialogue] Pas de start_sequence définie")
-		# ✅ NOUVEAU : Fallback vers la world map au lieu de bloquer
-		_fallback_to_world_map()
+		print("[IntroDialogue] Clés disponibles : ", campaign_start_data.keys())
+		
+		# ✅ AMÉLIORATION : Tenter une séquence par défaut
+		_execute_fallback_sequence()
 		return
 	
 	var sequence = campaign_start_data.start_sequence
@@ -75,6 +89,20 @@ func _execute_start_sequence() -> void:
 	print("[IntroDialogue] 🎬 Début de la séquence (", sequence.size(), " étapes)")
 	
 	_execute_next_step()
+
+# ✅ NOUVEAU : Séquence de secours
+func _execute_fallback_sequence() -> void:
+	"""Séquence minimale si le Lua échoue"""
+	print("[IntroDialogue] 🔄 Utilisation de la séquence de secours")
+	
+	# Notification simple
+	EventBus.notify("Bienvenue dans le jeu !", "info")
+	
+	# Attendre 2 secondes
+	await get_tree().create_timer(2.0).timeout
+	
+	# Aller directement à la world map
+	EventBus.change_scene(SceneRegistry.SceneID.WORLD_MAP)
 
 func _execute_next_step() -> void:
 	"""Exécute l'étape suivante de la séquence"""
