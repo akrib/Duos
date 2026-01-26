@@ -16,6 +16,12 @@ color = Color(0.15, 0.2, 0.15, 1)
 position = Vector2(960, 540)
 zoom = Vector2(0.8, 0.8)
 
+[node name="ConnectionsContainer" type="Node2D" parent="."]
+
+[node name="LocationsContainer" type="Node2D" parent="."]
+
+[node name="PlayerContainer" type="Node2D" parent="."]
+
 [node name="WorldGrid" type="TileMap" parent="."]
 format = 2
 

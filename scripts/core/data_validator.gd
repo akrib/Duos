@@ -385,10 +385,10 @@ static func validate_world_map(data: Dictionary, map_id: String = "") -> Validat
 	
 	Schéma attendu :
 	{
-	    "id": String,
-	    "locations": Array[Dictionary],
-	    "player": Dictionary,
-	    "connections_visual": Dictionary (optionnel)
+		"id": String,
+		"locations": Array[Dictionary],
+		"player": Dictionary,
+		"connections_visual": Dictionary (optionnel)
 	}
 	"""
 	

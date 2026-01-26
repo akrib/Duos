@@ -47,7 +47,7 @@ var action_menu_container: VBoxContainer = null
 # ============================================================================
 
 func _ready() -> void:
-	_create_containers()
+	#_create_containers()
 	_create_action_menu()
 	_connect_ui_buttons()
 	_load_world_map_data()
