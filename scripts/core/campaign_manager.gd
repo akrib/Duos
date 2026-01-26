@@ -10,10 +10,7 @@ var campaign_state: Dictionary = {
 	"battles_won": 0
 }
 
-# ✅ NE PLUS AVOIR DE DONNÉES ICI
-# const BATTLE_DATA = {} ← SUPPRIMÉ
-
-# ✅ Chemins vers les fichiers Lua de données
+# ✅ Chemins vers les fichiers JSON de données de combat
 const BATTLE_DATA_PATHS: Dictionary = {
 	"tutorial": "res://data/battles/tutorial.json",
 	"forest_battle": "res://data/battles/forest_battle.json",
@@ -23,25 +20,32 @@ const BATTLE_DATA_PATHS: Dictionary = {
 
 func _ready() -> void:
 	EventBus.safe_connect("battle_ended", _on_battle_ended)
-	#_load_campaign_flow()
-	print("[CampaignManager] Initialisé (mode Lua)")
+	print("[CampaignManager] ✅ Initialisé (mode JSON)")
 
-## Démarrer un combat en chargeant ses données depuis Lua
+## Démarrer un combat en chargeant ses données depuis JSON
 func start_battle(battle_id: String) -> void:
 	print("[CampaignManager] 🎯 Chargement du combat : ", battle_id)
 	
-	# ✅ Charger depuis JSON au lieu de Lua
+	# Charger depuis JSON
 	var battle_data = load_battle_data_from_json(battle_id)
 	
 	if battle_data.is_empty():
 		push_error("[CampaignManager] Impossible de charger : ", battle_id)
 		return
 	
-	# Le reste identique...
+	# Ajouter un ID unique
 	battle_data["battle_id"] = battle_id + "_" + str(Time.get_unix_time_from_system())
+	
+	# Stocker dans BattleDataManager
 	var stored = BattleDataManager.set_battle_data(battle_data)
+	
+	if stored:
+		print("[CampaignManager] ✅ Données de combat stockées")
+		EventBus.change_scene(SceneRegistry.SceneID.BATTLE)
+	else:
+		push_error("[CampaignManager] ❌ Échec du stockage des données")
 
-## Charge un fichier Lua de données de combat
+## Charge un fichier JSON de données de combat
 func load_battle_data_from_json(battle_id: String) -> Dictionary:
 	if not BATTLE_DATA_PATHS.has(battle_id):
 		push_error("[CampaignManager] Battle ID inconnu : ", battle_id)
@@ -58,8 +62,10 @@ func load_battle_data_from_json(battle_id: String) -> Dictionary:
 	# Convertir position {x, y} → Vector2i
 	battle_data = _convert_json_positions(battle_data)
 	
+	print("[CampaignManager] ✅ Battle data chargée : ", battle_id)
 	return battle_data
 
+## Convertit les positions JSON en Vector2i
 func _convert_json_positions(data: Dictionary) -> Dictionary:
 	var result = data.duplicate(true)
 	
@@ -79,7 +85,6 @@ func _convert_json_positions(data: Dictionary) -> Dictionary:
 	
 	return result
 
-
 func _on_battle_ended(results: Dictionary) -> void:
 	print("[CampaignManager] Combat terminé")
 	
@@ -89,19 +94,20 @@ func _on_battle_ended(results: Dictionary) -> void:
 
 func _advance_campaign() -> void:
 	campaign_state.current_battle += 1
-	# Logique de progression...
+	# TODO: Logique de progression de campagne
 
+## Démarre une nouvelle campagne
 func start_new_campaign() -> void:
-	print("[CampaignManager] 🎮 Démarrage nouvelle campagne (Lua)")
+	print("[CampaignManager] 🎮 Démarrage nouvelle campagne (JSON)")
 	
-	# Charger les données de démarrage depuis Lua
-	var campaign_data = _load_campaign_start_from_lua()
+	# Charger les données de démarrage depuis JSON
+	var campaign_data = _load_campaign_start_from_json()
 	
 	if campaign_data.is_empty():
-		push_error("[CampaignManager] Impossible de charger campaign_start.lua")
+		push_error("[CampaignManager] Impossible de charger campaign_start.json")
 		return
 	
-	# Initialiser l'état de la campagne depuis Lua
+	# Initialiser l'état de la campagne depuis JSON
 	if campaign_data.has("initial_state"):
 		var initial_state = campaign_data.initial_state
 		campaign_state.current_chapter = initial_state.get("chapter", 1)
@@ -113,19 +119,20 @@ func start_new_campaign() -> void:
 	
 	print("[CampaignManager] ✅ Campagne initialisée : ", campaign_data.get("campaign_id"))
 
-## Charge le fichier campaign_start.lua
-func _load_campaign_start_from_lua() -> Dictionary:
-	var lua_path = "res://lua/campaign/campaign_start.lua"
+## Charge le fichier campaign_start.json
+func _load_campaign_start_from_json() -> Dictionary:
+	var json_path = "res://data/campaign/campaign_start.json"
 	
-	if not FileAccess.file_exists(lua_path):
-		push_error("[CampaignManager] Fichier introuvable : ", lua_path)
+	if not FileAccess.file_exists(json_path):
+		push_error("[CampaignManager] Fichier introuvable : ", json_path)
 		return {}
 	
-	# ✅ CORRECTION : Utiliser LuaDataLoader
-	var data = LuaDataLoader.load_lua_data(lua_path, false, true)
+	# Utiliser JSONDataLoader
+	var json_loader = JSONDataLoader.new()
+	var data = json_loader.load_json_file(json_path)
 	
-	if typeof(data) != TYPE_DICTIONARY:
-		push_error("[CampaignManager] Format invalide pour campaign_start.lua")
+	if typeof(data) != TYPE_DICTIONARY or data.is_empty():
+		push_error("[CampaignManager] Format invalide pour campaign_start.json")
 		return {}
 	
 	return data
