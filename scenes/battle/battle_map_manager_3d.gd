@@ -84,9 +84,12 @@ var unit_manager: UnitManager3D
 var movement_module: MovementModule3D
 var action_module: ActionModule3D
 var objective_module: ObjectiveModule
-var scenario_module: ScenarioModule
+
 var stats_tracker: BattleStatsTracker
 var ai_module: AIModule3D
+#var scenario_module: ScenarioModule
+var lua_scenario_module: LuaScenarioModule
+var lua_event_handler: LuaBattleEventHandler
 
 # ============================================================================
 # CONFIGURATION
@@ -126,9 +129,7 @@ var is_camera_rotating: bool = false
 # Raycasting
 var mouse_ray_length: float = 1000.0
 
-# LUA 
-var lua_scenario_module: LuaScenarioModule
-var lua_event_handler: LuaBattleEventHandler
+
 
 
 # ============================================================================
@@ -137,19 +138,19 @@ var lua_event_handler: LuaBattleEventHandler
 
 
 func _ready() -> void:
-    _setup_camera()
-    _connect_ui_buttons()
-    
-    print("[BattleMapManager3D] Initialisé, vérification des données...")
-    
-    await get_tree().process_frame
-    
-    if BattleDataManager.has_battle_data():
-        var battle_data = BattleDataManager.get_battle_data()
-        print("[BattleMapManager3D] ✅ Données récupérées : ", battle_data.get("battle_id"))
-        call_deferred("initialize_battle", battle_data)
-    else:
-        push_error("[BattleMapManager3D] ❌ Aucune donnée de combat disponible")
+	_setup_camera()
+	_connect_ui_buttons()
+	
+	print("[BattleMapManager3D] Initialisé, vérification des données...")
+	
+	await get_tree().process_frame
+	
+	if BattleDataManager.has_battle_data():
+		var battle_data = BattleDataManager.get_battle_data()
+		print("[BattleMapManager3D] ✅ Données récupérées : ", battle_data.get("battle_id"))
+		call_deferred("initialize_battle", battle_data)
+	else:
+		push_error("[BattleMapManager3D] ❌ Aucune donnée de combat disponible")
 
 func _setup_camera() -> void:
 	camera_rig.position = Vector3.ZERO
@@ -176,32 +177,32 @@ func _connect_ui_buttons() -> void:
 	end_turn_button.pressed.connect(_on_end_turn_pressed)
 
 func initialize_battle(data: Dictionary) -> void:
-    if is_battle_active:
-        push_warning("[BattleMapManager3D] Combat déjà en cours")
-        return
-    
-    battle_data = data
-    is_battle_active = true
-    
-    print("[BattleMapManager3D] ⚔️ Initialisation du combat 3D...")
-    
-    await _initialize_modules()
-    
-    if scenario_module and dialogue_box:
-        scenario_module.dialogue_box = dialogue_box
-        print("[BattleMapManager3D] DialogueBox configurée pour le scenario_module")
-    
-    await _load_terrain(data.get("terrain", "plains"))
-    await _load_objectives(data.get("objectives", {}))
-    await _load_scenario(data.get("scenario", {}))
-    await _spawn_units(data.get("player_units", []), data.get("enemy_units", []))
-    await _start_battle()
-    
-    # ✅ NOUVEAU : Nettoyer les données après usage
-    # BattleDataManager.clear_battle_data()  # Optionnel ici, déjà fait par signal battle_ended
-    
-    print("[BattleMapManager3D] ✅ Combat prêt !")
-    battle_map_ready.emit()
+	if is_battle_active:
+		push_warning("[BattleMapManager3D] Combat déjà en cours")
+		return
+	
+	battle_data = data
+	is_battle_active = true
+	
+	print("[BattleMapManager3D] ⚔️ Initialisation du combat 3D...")
+	
+	await _initialize_modules()
+	
+	if lua_scenario_module and dialogue_box:
+		lua_scenario_module.dialogue_box = dialogue_box
+		print("[BattleMapManager3D] DialogueBox configurée pour lua_scenario_module")
+	
+	await _load_terrain(data.get("terrain", "plains"))
+	await _load_objectives(data.get("objectives", {}))
+	await _load_scenario(data.get("scenario", {}))
+	await _spawn_units(data.get("player_units", []), data.get("enemy_units", []))
+	await _start_battle()
+	
+	# ✅ NOUVEAU : Nettoyer les données après usage
+	# BattleDataManager.clear_battle_data()  # Optionnel ici, déjà fait par signal battle_ended
+	
+	print("[BattleMapManager3D] ✅ Combat prêt !")
+	battle_map_ready.emit()
 	
 # ============================================================================
 # INITIALISATION DES MODULES (identique)
@@ -232,8 +233,8 @@ func _initialize_modules() -> void:
 	objective_module = ObjectiveModule.new()
 	add_child(objective_module)
 	
-	scenario_module = ScenarioModule.new()
-	add_child(scenario_module)
+	lua_scenario_module = LuaScenarioModule.new()
+	add_child(lua_scenario_module)
 	
 	stats_tracker = BattleStatsTracker.new()
 	add_child(stats_tracker)
@@ -288,9 +289,8 @@ func _load_scenario(scenario_data: Dictionary) -> void:
 		# Charger un scénario Lua
 		lua_scenario_module.setup_lua_scenario(scenario_data.lua_script)
 	else:
-		if scenario_data.is_empty():
-			return
-		scenario_module.setup_scenario(scenario_data)
+		push_warning("[BattleMapManager3D] Pas de scénario Lua fourni")
+
 	await get_tree().process_frame
 
 func _spawn_units(player_units: Array, enemy_units: Array) -> void:
@@ -315,10 +315,10 @@ func _start_battle() -> void:
 	# ✅ CORRECTION : S'assurer que la scène est complètement chargée
 	print("[BattleMapManager3D] 🎬 Démarrage du combat...")
 	
-	if scenario_module.has_intro():
+	if lua_scenario_module.has_intro():
 		change_phase(TurnPhase.CUTSCENE)
 		print("[BattleMapManager3D] Lancement de l'intro...")
-		await scenario_module.play_intro()
+		await lua_scenario_module.play_intro()
 		print("[BattleMapManager3D] Intro terminée")
 	
 	EventBus.battle_started.emit(battle_data)
@@ -339,7 +339,7 @@ func _start_player_turn() -> void:
 	print("[BattleMapManager3D] === Tour ", current_turn, " - JOUEUR ===")
 	turn_label.text = "Tour " + str(current_turn)
 	unit_manager.reset_player_units()
-	scenario_module.trigger_turn_event(current_turn, true)
+	lua_scenario_module.trigger_turn_event(current_turn, false)
 	set_process_input(true)
 
 func _end_player_turn() -> void:
@@ -355,7 +355,7 @@ func _end_player_turn() -> void:
 func _start_enemy_turn() -> void:
 	print("[BattleMapManager3D] === Tour ", current_turn, " - ENNEMI ===")
 	unit_manager.reset_enemy_units()
-	scenario_module.trigger_turn_event(current_turn, false)
+	lua_scenario_module.trigger_turn_event(current_turn, false)
 	await ai_module.execute_enemy_turn()
 	_end_enemy_turn()
 
@@ -755,7 +755,7 @@ func _on_unit_died(unit: BattleUnit3D) -> void:
 	_check_battle_end()
 
 func _on_unit_moved(unit: BattleUnit3D, from: Vector2i, to: Vector2i) -> void:
-	scenario_module.trigger_position_event(unit, to)
+	lua_scenario_module.trigger_position_event(unit, to)
 	objective_module.check_position_objectives(unit, to)
 
 func _on_objective_completed(objective_id: String) -> void:
@@ -781,9 +781,9 @@ func _check_battle_end() -> void:
 func _end_battle(victory: bool) -> void:
 	is_battle_active = false
 	
-	if scenario_module.has_outro():
+	if lua_scenario_module.has_outro():
 		change_phase(TurnPhase.CUTSCENE)
-		await scenario_module.play_outro(victory)
+		await lua_scenario_module.play_outro(victory)
 	
 	var battle_stats = stats_tracker.get_final_stats()
 	var results = {

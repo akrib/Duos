@@ -1,26 +1,50 @@
 # scenes/battle/lua_scenario_module.gd
-extends ScenarioModule
+extends Node
 class_name LuaScenarioModule
+
+## 🎬 MODULE DE SCÉNARIO 100% LUA
+## Gère tous les événements, dialogues et triggers via Lua uniquement
+
+# ============================================================================
+# SIGNAUX
+# ============================================================================
+
+signal dialogue_started(dialogue_id: String)
+signal dialogue_ended(dialogue_id: String)
+signal event_triggered(event_id: String)
+
+# ============================================================================
+# DONNÉES
+# ============================================================================
 
 var lua_script_path: String = ""
 var lua_functions: Dictionary = {}
+var triggered_events: Array[String] = []
+
+# ✅ Référence à la DialogueBox (comme l'ancien ScenarioModule)
+var dialogue_box: DialogueBox = null
+
+# ============================================================================
+# SETUP
+# ============================================================================
 
 func setup_lua_scenario(script_path: String) -> void:
+	"""Configure un scénario Lua"""
 	lua_script_path = script_path
 	
 	# Charger le script Lua
 	var error = LuaManager.load_script(script_path)
 	if error:
-		push_error("[LuaScenarioModule] Erreur: ", error.message)
+		push_error("[LuaScenarioModule] Erreur : ", error.message)
 		return
 	
 	# Récupérer les fonctions exposées
 	_discover_lua_functions()
 	
-	print("[LuaScenarioModule] Scénario Lua chargé: ", script_path)
+	print("[LuaScenarioModule] ✅ Scénario Lua chargé : ", script_path)
 
 func _discover_lua_functions() -> void:
-	# Vérifier quelles fonctions le script Lua expose
+	"""Détecte les fonctions Lua exposées"""
 	var standard_functions = [
 		"on_intro",
 		"on_outro",
@@ -37,23 +61,69 @@ func _discover_lua_functions() -> void:
 		if LuaManager.function_exists(func_name):
 			lua_functions[func_name] = true
 
+# ============================================================================
+# INTRO / OUTRO
+# ============================================================================
+
+func has_intro() -> bool:
+	"""Vérifie s'il y a une intro Lua"""
+	return lua_functions.has("on_intro")
+
 func play_intro() -> void:
-	if lua_functions.has("on_intro"):
-		var dialogue_data = LuaManager.call_lua_function("on_intro", [])
-		if dialogue_data:
-			await _play_lua_dialogue(dialogue_data)
-	else:
-		await super.play_intro()
+	"""Joue l'intro depuis Lua"""
+	if not lua_functions.has("on_intro"):
+		return
+	
+	var dialogue_data = LuaManager.call_lua_function("on_intro", [])
+	if dialogue_data:
+		await _play_lua_dialogue(dialogue_data)
+
+func has_outro() -> bool:
+	"""Vérifie s'il y a une outro Lua"""
+	return lua_functions.has("on_outro")
+
+func play_outro(victory: bool) -> void:
+	"""Joue l'outro depuis Lua"""
+	if not lua_functions.has("on_outro"):
+		return
+	
+	var dialogue_data = LuaManager.call_lua_function("on_outro", [victory])
+	if dialogue_data:
+		await _play_lua_dialogue(dialogue_data)
+
+# ============================================================================
+# TRIGGERS
+# ============================================================================
 
 func trigger_turn_event(turn: int, is_player: bool) -> void:
-	if lua_functions.has("on_turn_start"):
-		var event_data = LuaManager.call_lua_function("on_turn_start", [turn, is_player])
-		if event_data:
-			await _execute_lua_event(event_data)
+	"""Déclenche les événements de tour depuis Lua"""
+	if not lua_functions.has("on_turn_start"):
+		return
 	
-	super.trigger_turn_event(turn, is_player)
+	var event_data = LuaManager.call_lua_function("on_turn_start", [turn, is_player])
+	if event_data:
+		await _execute_lua_event(event_data)
+
+func trigger_position_event(unit: BattleUnit3D, pos: Vector2i) -> void:
+	"""Déclenche les événements de position depuis Lua"""
+	if not lua_functions.has("on_unit_move"):
+		return
+	
+	var unit_data = {
+		"name": unit.unit_name,
+		"position": {"x": pos.x, "y": pos.y}
+	}
+	
+	var event_data = LuaManager.call_lua_function("on_unit_move", [unit_data])
+	if event_data:
+		await _execute_lua_event(event_data)
+
+# ============================================================================
+# EXÉCUTION D'ÉVÉNEMENTS LUA
+# ============================================================================
 
 func _execute_lua_event(event_data: Dictionary) -> void:
+	"""Exécute un événement Lua"""
 	match event_data.get("type", ""):
 		"dialogue":
 			await _play_lua_dialogue(event_data.get("dialogue", []))
@@ -65,7 +135,11 @@ func _execute_lua_event(event_data: Dictionary) -> void:
 			EventBus.emit_signal("cutscene_requested", event_data.get("cutscene_id", ""))
 		
 		_:
-			push_warning("[LuaScenarioModule] Type d'événement inconnu: ", event_data.type)
+			push_warning("[LuaScenarioModule] Type d'événement inconnu : ", event_data.type)
+
+# ============================================================================
+# SYSTÈME DE DIALOGUE
+# ============================================================================
 
 func _play_lua_dialogue(dialogue_lines: Array) -> void:
 	"""Joue un dialogue provenant de Lua"""
@@ -89,5 +163,5 @@ func _play_lua_dialogue(dialogue_lines: Array) -> void:
 	# Démarrer le dialogue
 	Dialogue_Manager.start_dialogue(dialogue_data, dialogue_box)
 	
-	# Attendre que le dialogue se termine
+	# Attendre la fin
 	await Dialogue_Manager.dialogue_ended
