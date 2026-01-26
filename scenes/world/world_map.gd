@@ -243,7 +243,7 @@ func travel_to_selected_location() -> void:
 			# EventBus.change_scene(SceneRegistry.SceneID.TOWN)
 		
 		"Zone de Combat":
-			_start_forest_battle()
+			campaign_manager.start_battle("forest_battle")
 	
 	selected_location = ""
 

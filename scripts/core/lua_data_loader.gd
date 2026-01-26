@@ -132,13 +132,12 @@ static func load_lua_folder(folder_path: String, use_cache: bool = true) -> Dict
 # ============================================================================
 
 ## Exécute un fichier Lua et retourne le résultat
-## Exécute un fichier Lua et retourne le résultat
+# scripts/core/lua_data_loader.gd
+
 static func _execute_lua_file(lua_path: String) -> Variant:
-	# Créer une instance LuaAPI dédiée
 	var lua = LuaAPI.new()
 	_setup_lua_environment(lua)
 	
-	# Lire le contenu du fichier
 	var file = FileAccess.open(lua_path, FileAccess.READ)
 	if not file:
 		push_error("[LuaDataLoader] Impossible d'ouvrir : ", lua_path)
@@ -147,18 +146,36 @@ static func _execute_lua_file(lua_path: String) -> Variant:
 	var lua_content = file.get_as_text()
 	file.close()
 	
-	# ✅ CORRECTION : Convertir "return { ... }" en "_RESULT = { ... }"
-	var trimmed = lua_content.strip_edges()
+	# ✅ CORRECTION : Détecter le premier `return` en ignorant les commentaires
+	var lines = lua_content.split("\n")
+	var first_code_line_index = -1
+	
+	for i in range(lines.size()):
+		var line = lines[i].strip_edges()
+		# Ignorer lignes vides et commentaires
+		if line.is_empty() or line.begins_with("--"):
+			continue
+		first_code_line_index = i
+		break
+	
 	var assignment_code: String
 	
-	if trimmed.begins_with("return "):
-		# Retirer "return " du début (7 caractères)
-		assignment_code = "_RESULT = " + trimmed.substr(7)
+	# Vérifier si le premier code est un return
+	if first_code_line_index >= 0:
+		var first_code_line = lines[first_code_line_index].strip_edges()
+		
+		if first_code_line.begins_with("return "):
+			# ✅ WRAPPER dans une fonction pour capturer le return
+			assignment_code = "local __temp_func = function()\n" + lua_content + "\nend\n_RESULT = __temp_func()"
+		else:
+			# Pas de return, assigner directement
+			assignment_code = "_RESULT = " + lua_content
 	else:
-		# Si pas de return, assigner directement
-		assignment_code = "_RESULT = " + trimmed
+		# Fichier vide ou que des commentaires
+		push_error("[LuaDataLoader] Fichier sans code : ", lua_path)
+		return null
 	
-	# Exécuter le code Lua
+	# Exécuter
 	var error = lua.do_string(assignment_code)
 	if error is LuaError:
 		push_error("[LuaDataLoader] Erreur Lua dans ", lua_path, " : ", error.message)
@@ -171,7 +188,8 @@ static func _execute_lua_file(lua_path: String) -> Variant:
 	lua.do_string("_RESULT = nil")
 	
 	return result
-	
+
+
 ## Configure l'environnement Lua standard
 static func _setup_lua_environment(lua: LuaAPI) -> void:
 	# Bibliothèques de base

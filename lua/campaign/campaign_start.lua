@@ -1,12 +1,15 @@
--- lua/campaign/campaign_start.lua
--- Définit le déroulé complet du début de campagne
-
 return {
-    -- ID de la campagne
     campaign_id = "main_campaign",
     
-    -- Séquence de démarrage
     start_sequence = {
+        {
+            speaker = "Narrateur",
+            text = "Texte du premier dialogue..."
+        },
+        {
+            speaker = "Personnage",
+            text = "Autre dialogue..."
+        },
         {
             type = "dialogue",
             dialogue_id = "intro",  -- Référence au fichier lua/dialogues/intro.lua
