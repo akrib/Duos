@@ -88,8 +88,10 @@ var objective_module: ObjectiveModule
 var stats_tracker: BattleStatsTracker
 var ai_module: AIModule3D
 #var scenario_module: ScenarioModule
-var lua_scenario_module: LuaScenarioModule
-var lua_event_handler: LuaBattleEventHandler
+#var lua_scenario_module: LuaScenarioModule
+#var lua_event_handler: LuaBattleEventHandler
+var json_scenario_module: JSONScenarioModule
+
 
 # ============================================================================
 # CONFIGURATION
@@ -188,8 +190,8 @@ func initialize_battle(data: Dictionary) -> void:
 	
 	await _initialize_modules()
 	
-	if lua_scenario_module and dialogue_box:
-		lua_scenario_module.dialogue_box = dialogue_box
+	if json_scenario_module and dialogue_box:
+		json_scenario_module.dialogue_box = dialogue_box
 		print("[BattleMapManager3D] DialogueBox configurée pour lua_scenario_module")
 	
 	await _load_terrain(data.get("terrain", "plains"))
@@ -233,8 +235,8 @@ func _initialize_modules() -> void:
 	objective_module = ObjectiveModule.new()
 	add_child(objective_module)
 	
-	lua_scenario_module = LuaScenarioModule.new()
-	add_child(lua_scenario_module)
+	json_scenario_module = JSONScenarioModule.new()
+	add_child(json_scenario_module)
 	
 	stats_tracker = BattleStatsTracker.new()
 	add_child(stats_tracker)
@@ -246,13 +248,11 @@ func _initialize_modules() -> void:
 	ai_module.action_module = action_module
 	add_child(ai_module)
 	
-	lua_scenario_module = LuaScenarioModule.new()
-	add_child(lua_scenario_module)
 	
-	lua_event_handler = LuaBattleEventHandler.new()
-	lua_event_handler.battle_manager = self
-	lua_event_handler.set_lua_scenario(lua_scenario_module)
-	add_child(lua_event_handler)
+	#lua_event_handler = LuaBattleEventHandler.new()
+	#lua_event_handler.battle_manager = self
+	#lua_event_handler.set_lua_scenario(lua_scenario_module)
+	#add_child(lua_event_handler)
 	
 	
 	_connect_modules()
@@ -285,12 +285,10 @@ func _load_objectives(objectives_data: Dictionary) -> void:
 	await get_tree().process_frame
 
 func _load_scenario(scenario_data: Dictionary) -> void:
-	if scenario_data.has("lua_script"):
-		# Charger un scénario Lua
-		lua_scenario_module.setup_lua_scenario(scenario_data.lua_script)
+	if scenario_data.has("scenario_file"):
+		json_scenario_module.setup_scenario(scenario_data.scenario_file)
 	else:
-		push_warning("[BattleMapManager3D] Pas de scénario Lua fourni")
-
+		push_warning("[BattleMapManager3D] Pas de fichier de scénario fourni")
 	await get_tree().process_frame
 
 func _spawn_units(player_units: Array, enemy_units: Array) -> void:
@@ -315,10 +313,9 @@ func _start_battle() -> void:
 	# ✅ CORRECTION : S'assurer que la scène est complètement chargée
 	print("[BattleMapManager3D] 🎬 Démarrage du combat...")
 	
-	if lua_scenario_module.has_intro():
+	if json_scenario_module.has_intro():
 		change_phase(TurnPhase.CUTSCENE)
-		print("[BattleMapManager3D] Lancement de l'intro...")
-		await lua_scenario_module.play_intro()
+		await json_scenario_module.play_intro()
 		print("[BattleMapManager3D] Intro terminée")
 	
 	EventBus.battle_started.emit(battle_data)
