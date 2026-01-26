@@ -29,7 +29,9 @@ var area: Area2D
 # ============================================================================
 
 func _ready() -> void:
-	_create_visuals()
+	# ✅ CORRECTION: Ne rien faire si déjà créé dans setup()
+	if not sprite:
+		_create_visuals()
 
 func setup(data: Dictionary) -> void:
 	"""Configure la location avec ses données"""
@@ -48,6 +50,10 @@ func setup(data: Dictionary) -> void:
 	
 	# Déverrouillage
 	is_unlocked = true  # Sera géré par la world_map
+	
+	# ✅ CORRECTION: Créer les visuels AVANT de les mettre à jour
+	if not sprite:
+		_create_visuals()
 	
 	_update_visuals()
 
@@ -83,6 +89,11 @@ func _create_visuals() -> void:
 
 func _update_visuals() -> void:
 	"""Met à jour l'apparence selon l'état"""
+	
+	# ✅ PROTECTION: Vérifier que les visuels existent
+	if not sprite or not label or not area:
+		push_warning("[WorldMapLocation] Visuels non initialisés pour: ", location_name)
+		return
 	
 	# Texture
 	var icon_path = location_data.get("icon", "res://icon.svg")

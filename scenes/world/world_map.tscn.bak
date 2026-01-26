@@ -1,0 +1,286 @@
+[gd_scene load_steps=4 format=3 uid="uid://cnb8xh4y5qw7m"]
+
+[ext_resource type="Script" uid="uid://dpfs2p4ib7fjk" path="res://scenes/world/world_map.gd" id="1_world_map"]
+[ext_resource type="PackedScene" uid="uid://byp8xytm75beo" path="res://scenes/ui/dialogue_box.tscn" id="2_jabx1"]
+[ext_resource type="Texture2D" uid="uid://c8chvygqvhoci" path="res://icon.svg" id="2_lhxl1"]
+
+[node name="WorldMap" type="Node2D"]
+script = ExtResource("1_world_map")
+
+[node name="Background" type="ColorRect" parent="."]
+offset_right = 1920.0
+offset_bottom = 1080.0
+color = Color(0.15, 0.2, 0.15, 1)
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(960, 540)
+zoom = Vector2(0.8, 0.8)
+
+[node name="ConnectionsContainer" type="Node2D" parent="."]
+
+[node name="LocationsContainer" type="Node2D" parent="."]
+
+[node name="PlayerContainer" type="Node2D" parent="."]
+
+[node name="WorldGrid" type="TileMap" parent="."]
+format = 2
+
+[node name="MapElements" type="Node2D" parent="."]
+
+[node name="Town1" type="Sprite2D" parent="MapElements"]
+position = Vector2(400, 300)
+scale = Vector2(2, 2)
+
+[node name="Town1Label" type="Label" parent="MapElements/Town1"]
+offset_left = -40.0
+offset_top = 40.0
+offset_right = 40.0
+offset_bottom = 70.0
+scale = Vector2(0.5, 0.5)
+theme_override_colors/font_color = Color(1, 1, 0.8, 1)
+theme_override_font_sizes/font_size = 24
+text = "Village du Nord"
+horizontal_alignment = 1
+
+[node name="Castle" type="Sprite2D" parent="MapElements"]
+position = Vector2(960, 540)
+scale = Vector2(3, 3)
+
+[node name="CastleLabel" type="Label" parent="MapElements/Castle"]
+offset_left = -50.0
+offset_top = 50.0
+offset_right = 50.0
+offset_bottom = 80.0
+scale = Vector2(0.333333, 0.333333)
+theme_override_colors/font_color = Color(0.9, 0.8, 0.5, 1)
+theme_override_font_sizes/font_size = 32
+text = "Château Royal"
+horizontal_alignment = 1
+
+[node name="Town2" type="Sprite2D" parent="MapElements"]
+position = Vector2(1500, 700)
+scale = Vector2(2, 2)
+
+[node name="Town2Label" type="Label" parent="MapElements/Town2"]
+offset_left = -40.0
+offset_top = 40.0
+offset_right = 40.0
+offset_bottom = 70.0
+scale = Vector2(0.5, 0.5)
+theme_override_colors/font_color = Color(1, 1, 0.8, 1)
+theme_override_font_sizes/font_size = 24
+text = "Port de l'Est"
+horizontal_alignment = 1
+
+[node name="BattleZone1" type="Sprite2D" parent="MapElements"]
+modulate = Color(1, 0.3, 0.3, 1)
+position = Vector2(700, 650)
+scale = Vector2(2.5, 2.5)
+
+[node name="BattleLabel" type="Label" parent="MapElements/BattleZone1"]
+offset_left = -45.0
+offset_top = 45.0
+offset_right = 45.0
+offset_bottom = 75.0
+scale = Vector2(0.4, 0.4)
+theme_override_colors/font_color = Color(1, 0.5, 0.5, 1)
+theme_override_font_sizes/font_size = 28
+text = "⚔ Zone de Combat"
+horizontal_alignment = 1
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="DialogueBox" parent="UI" instance=ExtResource("2_jabx1")]
+
+[node name="TopBar" type="PanelContainer" parent="UI"]
+offset_right = 1920.0
+offset_bottom = 80.0
+
+[node name="TopBarBg" type="ColorRect" parent="UI/TopBar"]
+layout_mode = 2
+color = Color(0.1, 0.1, 0.12, 0.9)
+
+[node name="MarginContainer" type="MarginContainer" parent="UI/TopBar"]
+layout_mode = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 10
+
+[node name="HBoxContainer" type="HBoxContainer" parent="UI/TopBar/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 40
+
+[node name="TitleLabel" type="Label" parent="UI/TopBar/MarginContainer/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.9, 0.85, 0.7, 1)
+theme_override_font_sizes/font_size = 32
+text = "CARTE DU MONDE"
+
+[node name="DivinityPanel" type="HBoxContainer" parent="UI/TopBar/MarginContainer/HBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 30
+
+[node name="AstraeonLabel" type="Label" parent="UI/TopBar/MarginContainer/HBoxContainer/DivinityPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.5, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 20
+text = "⚖ Astraeon: 0"
+
+[node name="KharvulLabel" type="Label" parent="UI/TopBar/MarginContainer/HBoxContainer/DivinityPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.5, 0.5, 1)
+theme_override_font_sizes/font_size = 20
+text = "⚡ Kharvûl: 0"
+
+[node name="BottomBar" type="PanelContainer" parent="UI"]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_top = -120.0
+offset_right = 1920.0
+grow_vertical = 0
+
+[node name="BottomBarBg" type="ColorRect" parent="UI/BottomBar"]
+layout_mode = 2
+color = Color(0.1, 0.1, 0.12, 0.9)
+
+[node name="MarginContainer" type="MarginContainer" parent="UI/BottomBar"]
+layout_mode = 2
+theme_override_constants/margin_left = 30
+theme_override_constants/margin_top = 15
+theme_override_constants/margin_right = 30
+theme_override_constants/margin_bottom = 15
+
+[node name="HBoxContainer" type="HBoxContainer" parent="UI/BottomBar/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="InfoLabel" type="Label" parent="UI/BottomBar/MarginContainer/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.8, 0.8, 0.8, 1)
+theme_override_font_sizes/font_size = 22
+text = "Sélectionnez une destination pour voyager"
+vertical_alignment = 1
+
+[node name="ButtonsContainer" type="HBoxContainer" parent="UI/BottomBar/MarginContainer/HBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 15
+
+[node name="PartyButton" type="Button" parent="UI/BottomBar/MarginContainer/HBoxContainer/ButtonsContainer"]
+custom_minimum_size = Vector2(150, 60)
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "👥 Équipe"
+
+[node name="InventoryButton" type="Button" parent="UI/BottomBar/MarginContainer/HBoxContainer/ButtonsContainer"]
+custom_minimum_size = Vector2(150, 60)
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "🎒 Inventaire"
+
+[node name="MenuButton" type="Button" parent="UI/BottomBar/MarginContainer/HBoxContainer/ButtonsContainer"]
+custom_minimum_size = Vector2(150, 60)
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "📋 Menu"
+
+[node name="NotificationPanel" type="PanelContainer" parent="UI"]
+visible = false
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -250.0
+offset_top = 100.0
+offset_right = 250.0
+offset_bottom = 180.0
+grow_horizontal = 2
+
+[node name="NotificationBg" type="ColorRect" parent="UI/NotificationPanel"]
+layout_mode = 2
+color = Color(0.15, 0.15, 0.2, 0.95)
+
+[node name="MarginContainer" type="MarginContainer" parent="UI/NotificationPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 15
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 15
+
+[node name="NotificationLabel" type="Label" parent="UI/NotificationPanel/MarginContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 0.8, 1)
+theme_override_font_sizes/font_size = 24
+text = "Notification"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="DebugInfo" type="Label" parent="UI"]
+visible = false
+offset_left = 10.0
+offset_top = 90.0
+offset_right = 300.0
+offset_bottom = 200.0
+theme_override_colors/font_color = Color(0, 1, 0, 1)
+theme_override_font_sizes/font_size = 16
+text = "[DEBUG]
+Camera Pos: (0, 0)
+Zoom: 1.0"
+
+[node name="InteractionButtons" type="CanvasLayer" parent="."]
+
+[node name="Town1Button" type="Button" parent="InteractionButtons"]
+offset_left = 350.0
+offset_top = 250.0
+offset_right = 450.0
+offset_bottom = 350.0
+theme_override_colors/font_color = Color(1, 1, 0.8, 1)
+theme_override_font_sizes/font_size = 18
+text = "🏘️
+Village
+du Nord"
+flat = true
+
+[node name="CastleButton" type="Button" parent="InteractionButtons"]
+offset_left = 885.0
+offset_top = 465.0
+offset_right = 1035.0
+offset_bottom = 615.0
+theme_override_colors/font_color = Color(0.9, 0.8, 0.5, 1)
+theme_override_font_sizes/font_size = 20
+text = "🏰
+Château
+Royal"
+flat = true
+
+[node name="Town2Button" type="Button" parent="InteractionButtons"]
+offset_left = 1450.0
+offset_top = 650.0
+offset_right = 1550.0
+offset_bottom = 750.0
+theme_override_colors/font_color = Color(1, 1, 0.8, 1)
+theme_override_font_sizes/font_size = 18
+text = "⚓
+Port
+de l'Est"
+flat = true
+
+[node name="BattleButton" type="Button" parent="InteractionButtons"]
+offset_left = 607.0
+offset_top = 582.0
+offset_right = 757.0
+offset_bottom = 732.0
+theme_override_colors/font_color = Color(1, 0.5, 0.5, 1)
+theme_override_font_sizes/font_size = 20
+text = "⚔️
+Zone de
+Combat"
+flat = true
+
+[node name="BattleIcon" type="Sprite2D" parent="InteractionButtons/BattleButton"]
+modulate = Color(1, 0.3, 0.3, 0.5)
+position = Vector2(75, 75)
+texture = ExtResource("2_lhxl1")

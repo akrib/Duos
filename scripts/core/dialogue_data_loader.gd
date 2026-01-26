@@ -2,9 +2,6 @@
 class_name DialogueDataLoader
 extends Node
 
-## Charge les dialogues depuis JSON
-## Format: data/dialogues/*.json
-
 const DIALOGUES_DIR = "res://data/dialogues/"
 
 var _json_loader: JSONDataLoader
@@ -22,12 +19,38 @@ func load_all_dialogues() -> void:
 		print("Loaded %d dialogue sets" % dialogues.size())
 		EventBus.emit_signal("data_loaded", "dialogues", dialogues)
 
+# ✅ NOUVELLE MÉTHODE : Charge un dialogue spécifique
+func load_dialogue(dialogue_id: String) -> Dictionary:
+	"""
+	Charge un dialogue depuis un fichier JSON
+	
+	@param dialogue_id : ID du dialogue (nom du fichier sans .json)
+	@return Dictionary contenant le dialogue, ou {} si introuvable
+	"""
+	var file_path = DIALOGUES_DIR.path_join(dialogue_id + ".json")
+	
+	if not FileAccess.file_exists(file_path):
+		push_error("[DialogueDataLoader] Fichier introuvable : ", file_path)
+		return {}
+	
+	var data = _json_loader.load_json_file(file_path)
+	
+	if typeof(data) != TYPE_DICTIONARY or data.is_empty():
+		push_error("[DialogueDataLoader] Format invalide pour : ", dialogue_id)
+		return {}
+	
+	# Stocker en cache
+	dialogues[dialogue_id] = data
+	
+	return data
+
 func get_dialogue(dialogue_id: String) -> Dictionary:
+	# Vérifier le cache d'abord
 	if dialogues.has(dialogue_id):
 		return dialogues[dialogue_id]
 	
-	push_error("Dialogue not found: " + dialogue_id)
-	return {}
+	# Sinon, charger depuis le fichier
+	return load_dialogue(dialogue_id)
 
 func get_dialogue_node(dialogue_id: String, node_id: String) -> Dictionary:
 	var dialogue = get_dialogue(dialogue_id)
@@ -35,12 +58,10 @@ func get_dialogue_node(dialogue_id: String, node_id: String) -> Dictionary:
 		return dialogue.nodes[node_id]
 	return {}
 
-## Charge un dialogue spécifique pour hot-reload
 func reload_dialogue(dialogue_id: String) -> void:
 	var file_path = DIALOGUES_DIR.path_join(dialogue_id + ".json")
 	_json_loader.clear_cache(file_path)
-	var data = _json_loader.load_json_file(file_path)
+	var data = load_dialogue(dialogue_id)
 	
-	if data:
-		dialogues[dialogue_id] = data
+	if not data.is_empty():
 		EventBus.emit_signal("dialogue_reloaded", dialogue_id)
