@@ -65,6 +65,8 @@ func _execute_start_sequence() -> void:
 	
 	if not campaign_start_data.has("start_sequence"):
 		push_error("[IntroDialogue] Pas de start_sequence définie")
+		# ✅ NOUVEAU : Fallback vers la world map au lieu de bloquer
+		_fallback_to_world_map()
 		return
 	
 	var sequence = campaign_start_data.start_sequence

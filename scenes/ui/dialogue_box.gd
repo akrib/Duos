@@ -60,11 +60,9 @@ var selected_choice_index: int = 0
 # ============================================================================
 
 func _ready() -> void:
-	# ✅ Configuration initiale - état invisible par défaut
-	# N'utilise PAS hide_dialogue_box() qui pourrait écraser un show_dialogue_box() précédent
-	if not visible:
-		visible = false
-		modulate.a = 0.0
+	# ✅ CORRECTION : Forcer l'état invisible au démarrage
+	visible = false
+	modulate.a = 0.0
 	
 	# BBCode activé
 	if text_label:

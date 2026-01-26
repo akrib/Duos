@@ -132,6 +132,7 @@ static func load_lua_folder(folder_path: String, use_cache: bool = true) -> Dict
 # ============================================================================
 
 ## Exécute un fichier Lua et retourne le résultat
+## Exécute un fichier Lua et retourne le résultat
 static func _execute_lua_file(lua_path: String) -> Variant:
 	# Créer une instance LuaAPI dédiée
 	var lua = LuaAPI.new()
@@ -146,11 +147,19 @@ static func _execute_lua_file(lua_path: String) -> Variant:
 	var lua_content = file.get_as_text()
 	file.close()
 	
-	# ✅ CORRECTION : Wrapper le script dans une fonction pour capturer le return
-	var wrapped_code = "_lua_loader_fn = function() " + lua_content + " end; _RESULT = _lua_loader_fn()"
+	# ✅ CORRECTION : Convertir "return { ... }" en "_RESULT = { ... }"
+	var trimmed = lua_content.strip_edges()
+	var assignment_code: String
 	
-	# Exécuter le script Lua
-	var error = lua.do_string(wrapped_code)
+	if trimmed.begins_with("return "):
+		# Retirer "return " du début (7 caractères)
+		assignment_code = "_RESULT = " + trimmed.substr(7)
+	else:
+		# Si pas de return, assigner directement
+		assignment_code = "_RESULT = " + trimmed
+	
+	# Exécuter le code Lua
+	var error = lua.do_string(assignment_code)
 	if error is LuaError:
 		push_error("[LuaDataLoader] Erreur Lua dans ", lua_path, " : ", error.message)
 		return null
@@ -159,7 +168,7 @@ static func _execute_lua_file(lua_path: String) -> Variant:
 	var result = lua.pull_variant("_RESULT")
 	
 	# Nettoyer
-	lua.do_string("_lua_loader_fn = nil; _RESULT = nil")
+	lua.do_string("_RESULT = nil")
 	
 	return result
 	
