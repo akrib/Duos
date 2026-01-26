@@ -371,3 +371,164 @@ static func validate_all_items(items: Dictionary) -> Dictionary:
 		report.warnings += result.warnings.size()
 	
 	return report
+	
+	
+	# À ajouter dans scripts/core/data_validator.gd
+
+# ============================================================================
+# VALIDATION : WORLD MAP
+# ============================================================================
+
+static func validate_world_map(data: Dictionary, map_id: String = "") -> ValidationResult:
+	"""
+	Valide les données d'une world map
+	
+	Schéma attendu :
+	{
+	    "id": String,
+	    "locations": Array[Dictionary],
+	    "player": Dictionary,
+	    "connections_visual": Dictionary (optionnel)
+	}
+	"""
+	
+	var result = ValidationResult.new()
+	var context = "world_map[" + map_id + "]" if map_id else "world_map"
+	
+	# Champs obligatoires
+	_check_required(result, data, context, [
+		"id",
+		"locations"
+	])
+	
+	# Vérifier les locations
+	if data.has("locations"):
+		if typeof(data.locations) != TYPE_ARRAY:
+			result.add_error(context + ".locations : doit être un Array")
+		elif data.locations.is_empty():
+			result.add_warning(context + ".locations : est vide")
+		else:
+			for i in range(data.locations.size()):
+				_validate_world_map_location_ref(result, data.locations[i], context + ".locations[" + str(i) + "]")
+	
+	# Vérifier la config joueur
+	if data.has("player"):
+		_validate_world_map_player(result, data.player, context + ".player")
+	
+	return result
+
+static func _validate_world_map_location_ref(result: ValidationResult, location: Dictionary, context: String) -> void:
+	"""Valide une référence de location dans la liste principale"""
+	
+	_check_required(result, location, context, [
+		"id",
+		"name",
+		"position",
+		"unlocked_at_step"
+	])
+	
+	# Vérifier la position
+	if location.has("position"):
+		if typeof(location.position) != TYPE_VECTOR2I and not (typeof(location.position) == TYPE_DICTIONARY and location.position.has("x") and location.position.has("y")):
+			result.add_error(context + ".position : doit être Vector2i ou {x, y}")
+	
+	# Vérifier unlocked_at_step
+	if location.has("unlocked_at_step") and typeof(location.unlocked_at_step) != TYPE_INT:
+		result.add_error(context + ".unlocked_at_step : doit être un entier")
+
+static func _validate_world_map_player(result: ValidationResult, player: Dictionary, context: String) -> void:
+	"""Valide la config du joueur"""
+	
+	_check_required(result, player, context, [
+		"start_location"
+	])
+	
+	if player.has("move_speed") and typeof(player.move_speed) != TYPE_FLOAT and typeof(player.move_speed) != TYPE_INT:
+		result.add_error(context + ".move_speed : doit être un nombre")
+
+static func validate_world_map_location(data: Dictionary, location_id: String = "") -> ValidationResult:
+	"""
+	Valide les données détaillées d'une location
+	
+	Schéma attendu :
+	{
+	    "id": String,
+	    "name": String,
+	    "actions": Array[Dictionary],
+	    "npcs": Array[Dictionary] (optionnel),
+	    "places": Array[Dictionary] (optionnel)
+	}
+	"""
+	
+	var result = ValidationResult.new()
+	var context = "location[" + location_id + "]" if location_id else "location"
+	
+	# Champs obligatoires
+	_check_required(result, data, context, [
+		"id",
+		"name"
+	])
+	
+	# Vérifier les actions
+	if data.has("actions"):
+		if typeof(data.actions) != TYPE_ARRAY:
+			result.add_error(context + ".actions : doit être un Array")
+		else:
+			for i in range(data.actions.size()):
+				_validate_location_action(result, data.actions[i], context + ".actions[" + str(i) + "]")
+	
+	# Vérifier les NPCs
+	if data.has("npcs"):
+		if typeof(data.npcs) != TYPE_ARRAY:
+			result.add_error(context + ".npcs : doit être un Array")
+		else:
+			for i in range(data.npcs.size()):
+				_validate_location_npc(result, data.npcs[i], context + ".npcs[" + str(i) + "]")
+	
+	return result
+
+static func _validate_location_action(result: ValidationResult, action: Dictionary, context: String) -> void:
+	"""Valide une action de location"""
+	
+	_check_required(result, action, context, [
+		"id",
+		"label",
+		"type"
+	])
+	
+	if action.has("type"):
+		var valid_types = ["exploration", "building", "shop", "quest_board", "custom"]
+		if action.type not in valid_types:
+			result.add_error(context + " : type invalide '" + str(action.type) + "'")
+
+static func _validate_location_npc(result: ValidationResult, npc: Dictionary, context: String) -> void:
+	"""Valide un NPC de location"""
+	
+	_check_required(result, npc, context, [
+		"id",
+		"name",
+		"locations"
+	])
+	
+	if npc.has("locations"):
+		if typeof(npc.locations) != TYPE_ARRAY:
+			result.add_error(context + ".locations : doit être un Array")
+		elif npc.locations.is_empty():
+			result.add_error(context + ".locations : ne peut pas être vide")
+		else:
+			for i in range(npc.locations.size()):
+				_validate_npc_location_spot(result, npc.locations[i], context + ".locations[" + str(i) + "]")
+
+static func _validate_npc_location_spot(result: ValidationResult, spot: Dictionary, context: String) -> void:
+	"""Valide un spot de présence d'NPC"""
+	
+	_check_required(result, spot, context, [
+		"place_id",
+		"chance"
+	])
+	
+	if spot.has("chance"):
+		if typeof(spot.chance) != TYPE_INT and typeof(spot.chance) != TYPE_FLOAT:
+			result.add_error(context + ".chance : doit être un nombre")
+		elif spot.chance < 0 or spot.chance > 100:
+			result.add_error(context + ".chance : doit être entre 0 et 100")

@@ -1,279 +1,488 @@
+# scenes/world/world_map.gd
 extends Node2D
-## World Map - Carte du monde interactive
-## Point central de navigation entre les différentes zones du jeu
+## World Map - Carte du monde pilotée par Lua
+## VERSION 2.0 : Génération dynamique depuis Lua
 
 class_name WorldMap
 
-# Références UI
+# ============================================================================
+# RÉFÉRENCES
+# ============================================================================
+
 @onready var camera: Camera2D = $Camera2D
+@onready var ui_layer: CanvasLayer = $UI
+@onready var locations_container: Node2D = $LocationsContainer
+@onready var connections_container: Node2D = $ConnectionsContainer
+@onready var player_container: Node2D = $PlayerContainer
+
+# Labels UI existants
 @onready var info_label: Label = $UI/BottomBar/MarginContainer/HBoxContainer/InfoLabel
 @onready var party_button: Button = $UI/BottomBar/MarginContainer/HBoxContainer/ButtonsContainer/PartyButton
 @onready var inventory_button: Button = $UI/BottomBar/MarginContainer/HBoxContainer/ButtonsContainer/InventoryButton
 @onready var menu_button: Button = $UI/BottomBar/MarginContainer/HBoxContainer/ButtonsContainer/MenuButton
 @onready var notification_panel: PanelContainer = $UI/NotificationPanel
 @onready var notification_label: Label = $UI/NotificationPanel/MarginContainer/NotificationLabel
-@onready var astraeon_label: Label = $UI/TopBar/MarginContainer/HBoxContainer/DivinityPanel/AstraeonLabel
-@onready var kharvul_label: Label = $UI/TopBar/MarginContainer/HBoxContainer/DivinityPanel/KharvulLabel
-@onready var debug_info: Label = $UI/DebugInfo
 
-# Boutons d'interaction
-@onready var town1_button: Button = $InteractionButtons/Town1Button
-@onready var castle_button: Button = $InteractionButtons/CastleButton
-@onready var town2_button: Button = $InteractionButtons/Town2Button
-@onready var battle_button: Button = $InteractionButtons/BattleButton
+# ============================================================================
+# DONNÉES LUA
+# ============================================================================
 
-#dialogue 
-@onready var dialogue_box: DialogueBox = $UI/DialogueBox
-@onready var campaign_manager: CampaignManager = CampaignManager.new()
+var world_map_data: Dictionary = {}
+var locations: Dictionary = {}  # location_id -> WorldMapLocation
+var player: WorldMapPlayer = null
 
-# État
-var camera_velocity: Vector2 = Vector2.ZERO
-var camera_drag_start: Vector2 = Vector2.ZERO
-var is_dragging: bool = false
-var selected_location: String = ""
+# ============================================================================
+# ÉTAT
+# ============================================================================
 
-# Statistiques divines
-var divine_points: Dictionary = {
-	"Astraeon": 0,
-	"Kharvûl": 0
-}
+var current_step: int = 0  # Progression du joueur
+var selected_location: WorldMapLocation = null
 
-# Paramètres de navigation
-const CAMERA_SPEED: float = 400.0
-const CAMERA_ZOOM_SPEED: float = 0.1
-const MIN_ZOOM: float = 0.5
-const MAX_ZOOM: float = 1.5
+# Menu d'actions
+var action_menu: PopupPanel = null
+var action_menu_container: VBoxContainer = null
+
+# ============================================================================
+# INITIALISATION
+# ============================================================================
 
 func _ready() -> void:
-	# Connexions aux événements
-	_connect_to_event_bus()
+	_create_containers()
+	_create_action_menu()
+	_connect_ui_buttons()
+	_load_world_map_data()
+	_generate_map()
+	_spawn_player()
 	
-	# Afficher le mode debug si activé
-	debug_info.visible = OS.is_debug_build()
-	
-	# Message de bienvenue
-	show_notification("Bienvenue sur la carte du monde !", 3.0)
-
-	print("[WorldMap] Carte du monde initialisée")
-	
-
-## Auto-connexion des signaux via SceneLoader
-func _get_signal_connections() -> Array:
-	"""
-	Retourne les connexions de signaux pour SceneLoader
-	"""
-	if not is_node_ready():
-		return []
-	
-	return [
-		{
-			"source": party_button,
-			"signal_name": "pressed",
-			"target": self,
-			"method": "_on_party_pressed"
-		},
-		{
-			"source": inventory_button,
-			"signal_name": "pressed",
-			"target": self,
-			"method": "_on_inventory_pressed"
-		},
-		{
-			"source": menu_button,
-			"signal_name": "pressed",
-			"target": self,
-			"method": "_on_menu_pressed"
-		},
-		{
-			"source": town1_button,
-			"signal_name": "pressed",
-			"target": self,
-			"method": "_on_town1_clicked"
-		},
-		{
-			"source": castle_button,
-			"signal_name": "pressed",
-			"target": self,
-			"method": "_on_castle_clicked"
-		},
-		{
-			"source": town2_button,
-			"signal_name": "pressed",
-			"target": self,
-			"method": "_on_town2_clicked"
-		},
-		{
-			"source": battle_button,
-			"signal_name": "pressed",
-			"target": self,
-			"method": "_on_battle_clicked"
-		},
-	]
-
-# ============================================================================
-# CONNEXIONS EVENTBUS
-# ============================================================================
-
-func _connect_to_event_bus() -> void:
-	"""Connexion aux événements globaux"""
 	EventBus.safe_connect("notification_posted", _on_notification_posted)
-	EventBus.safe_connect("divine_points_gained", _on_divine_points_gained)
-	EventBus.safe_connect("battle_ended", _on_battle_ended)
-	EventBus.safe_connect("location_discovered", _on_location_discovered)
+	
+	print("[WorldMap] ✅ Carte générée depuis Lua")
+
+func _create_containers() -> void:
+	"""Crée les containers si ils n'existent pas"""
+	
+	if not has_node("LocationsContainer"):
+		locations_container = Node2D.new()
+		locations_container.name = "LocationsContainer"
+		add_child(locations_container)
+	
+	if not has_node("ConnectionsContainer"):
+		connections_container = Node2D.new()
+		connections_container.name = "ConnectionsContainer"
+		add_child(connections_container)
+	
+	if not has_node("PlayerContainer"):
+		player_container = Node2D.new()
+		player_container.name = "PlayerContainer"
+		add_child(player_container)
+
+func _create_action_menu() -> void:
+	"""Crée le menu d'actions (popup)"""
+	
+	action_menu = PopupPanel.new()
+	action_menu.name = "ActionMenu"
+	action_menu.visible = false
+	
+	var margin = MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 10)
+	margin.add_theme_constant_override("margin_top", 10)
+	margin.add_theme_constant_override("margin_right", 10)
+	margin.add_theme_constant_override("margin_bottom", 10)
+	action_menu.add_child(margin)
+	
+	action_menu_container = VBoxContainer.new()
+	action_menu_container.add_theme_constant_override("separation", 5)
+	margin.add_child(action_menu_container)
+	
+	ui_layer.add_child(action_menu)
+
+func _connect_ui_buttons() -> void:
+	"""Connecte les boutons UI existants"""
+	
+	if party_button:
+		party_button.pressed.connect(_on_party_pressed)
+	if inventory_button:
+		inventory_button.pressed.connect(_on_inventory_pressed)
+	if menu_button:
+		menu_button.pressed.connect(_on_menu_pressed)
 
 # ============================================================================
-# PROCESS & INPUT
+# CHARGEMENT DES DONNÉES LUA
 # ============================================================================
 
-func _process(delta: float) -> void:
-	# Navigation au clavier (WASD / Flèches)
-	_handle_keyboard_navigation(delta)
+func _load_world_map_data() -> void:
+	"""Charge les données de la world map depuis Lua"""
 	
-	# Mise à jour du debug
-	if OS.is_debug_build():
-		_update_debug_info()
-
-func _input(event: InputEvent) -> void:
-	# Zoom avec la molette
-	if event is InputEventMouseButton:
-		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
-			_zoom_camera(CAMERA_ZOOM_SPEED)
-		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			_zoom_camera(-CAMERA_ZOOM_SPEED)
-		
-		# Drag de la caméra
-		elif event.button_index == MOUSE_BUTTON_MIDDLE:
-			if event.pressed:
-				is_dragging = true
-				camera_drag_start = event.position
-			else:
-				is_dragging = false
+	world_map_data = WorldMapDataLoader.load_world_map_data("world_map_data", true)
 	
-	elif event is InputEventMouseMotion and is_dragging:
-		var delta_pos = (event.position - camera_drag_start) / camera.zoom.x
-		camera.position -= delta_pos
-		camera_drag_start = event.position
-	
-	# Raccourci menu (ESC)
-	if event.is_action_pressed("ui_cancel"):
-		_on_menu_pressed()
-
-func _handle_keyboard_navigation(delta: float) -> void:
-	"""Navigation de la caméra au clavier"""
-	var direction = Vector2.ZERO
-	
-	if Input.is_action_pressed("ui_right"):
-		direction.x += 1
-	if Input.is_action_pressed("ui_left"):
-		direction.x -= 1
-	if Input.is_action_pressed("ui_down"):
-		direction.y += 1
-	if Input.is_action_pressed("ui_up"):
-		direction.y -= 1
-	
-	if direction != Vector2.ZERO:
-		camera.position += direction.normalized() * CAMERA_SPEED * delta
-
-# ============================================================================
-# CAMÉRA
-# ============================================================================
-
-func _zoom_camera(zoom_delta: float) -> void:
-	"""Zoom de la caméra"""
-	var new_zoom = camera.zoom.x + zoom_delta
-	new_zoom = clamp(new_zoom, MIN_ZOOM, MAX_ZOOM)
-	camera.zoom = Vector2(new_zoom, new_zoom)
-
-func move_camera_to(target_position: Vector2, duration: float = 1.0) -> void:
-	"""Déplace la caméra vers une position avec animation"""
-	var tween = create_tween()
-	tween.tween_property(camera, "position", target_position, duration).set_ease(Tween.EASE_IN_OUT)
-
-# ============================================================================
-# INTERACTIONS AVEC LES ZONES (BOUTONS)
-# ============================================================================
-
-func _on_town1_clicked() -> void:
-	"""Clic sur le Village du Nord"""
-	select_location("Village du Nord", Vector2(400, 300))
-
-func _on_castle_clicked() -> void:
-	"""Clic sur le Château Royal"""
-	select_location("Château Royal", Vector2(960, 540))
-
-func _on_town2_clicked() -> void:
-	"""Clic sur le Port de l'Est"""
-	select_location("Port de l'Est", Vector2(1500, 700))
-
-func _on_battle_clicked() -> void:
-	"""Clic sur la Zone de Combat"""
-	print("[WorldMap] ✅ Clic sur Zone de Combat détecté !")
-	campaign_manager.start_battle("forest_battle")
-
-
-func select_location(location_name: String, position: Vector2) -> void:
-	"""Sélectionne une location et propose d'y voyager"""
-	selected_location = location_name
-	info_label.text = "Voyager vers : " + location_name + " ? (Appuyez sur Entrée)"
-	
-	# Centrer la caméra sur la location
-	move_camera_to(position, 0.8)
-	
-	print("[WorldMap] Location sélectionnée : ", location_name)
-
-func travel_to_selected_location() -> void:
-	"""Voyage vers la location sélectionnée"""
-	if selected_location == "":
+	if world_map_data.is_empty():
+		push_error("[WorldMap] ❌ Impossible de charger les données de la carte")
 		return
 	
-	show_notification("Voyage vers " + selected_location + "...", 2.0)
-	
-	# Router vers la scène appropriée
-	match selected_location:
-		"Village du Nord":
-			EventBus.notify("Village du Nord (scène à créer)", "info")
-			# EventBus.change_scene(SceneRegistry.SceneID.TOWN)
-		
-		"Château Royal":
-			EventBus.notify("Château Royal (scène à créer)", "info")
-			# EventBus.change_scene(SceneRegistry.SceneID.CASTLE)
-		
-		"Port de l'Est":
-			EventBus.notify("Port de l'Est (scène à créer)", "info")
-			# EventBus.change_scene(SceneRegistry.SceneID.TOWN)
-		
-		"Zone de Combat":
-			campaign_manager.start_battle("forest_battle")
-	
-	selected_location = ""
+	print("[WorldMap] 📦 Données chargées : ", world_map_data.get("name", "???"))
 
 # ============================================================================
-# UI CALLBACKS
+# GÉNÉRATION DE LA CARTE
+# ============================================================================
+
+func _generate_map() -> void:
+	"""Génère tous les éléments de la carte"""
+	
+	if world_map_data.is_empty():
+		return
+	
+	# 1. Créer les locations
+	_create_locations()
+	
+	# 2. Créer les connexions
+	_create_connections()
+	
+	print("[WorldMap] ✅ Carte générée : ", locations.size(), " locations")
+
+func _create_locations() -> void:
+	"""Crée toutes les locations sur la carte"""
+	
+	var locations_data = world_map_data.get("locations", [])
+	
+	for location_data in locations_data:
+		var location = WorldMapLocation.new()
+		location.setup(location_data)
+		
+		# Vérifier si déverrouillée
+		var unlocked = location_data.get("unlocked_at_step", 0) <= current_step
+		location.set_unlocked(unlocked)
+		
+		# Signaux
+		location.clicked.connect(_on_location_clicked)
+		location.hovered.connect(_on_location_hovered)
+		location.unhovered.connect(_on_location_unhovered)
+		
+		locations_container.add_child(location)
+		locations[location_data.id] = location
+
+func _create_connections() -> void:
+	"""Crée les lignes entre les locations"""
+	
+	var visual_config = world_map_data.get("connections_visual", {})
+	var line_color = Color(0.7, 0.7, 0.7, 0.6)
+	var line_color_locked = Color(0.3, 0.3, 0.3, 0.3)
+	var line_width = 3.0
+	
+	if visual_config.has("color"):
+		var c = visual_config.color
+		line_color = Color(c.get("r", 0.7), c.get("g", 0.7), c.get("b", 0.7), c.get("a", 0.6))
+	
+	if visual_config.has("color_locked"):
+		var c = visual_config.color_locked
+		line_color_locked = Color(c.get("r", 0.3), c.get("g", 0.3), c.get("b", 0.3), c.get("a", 0.3))
+	
+	if visual_config.has("width"):
+		line_width = visual_config.width
+	
+	# Parcourir toutes les locations
+	for location_id in locations:
+		var location = locations[location_id]
+		var connections = location.get_connections()
+		
+		for target_id in connections:
+			if not locations.has(target_id):
+				continue
+			
+			var target_location = locations[target_id]
+			
+			# Ne créer qu'une seule ligne par paire (éviter doublons)
+			if location_id > target_id:
+				continue
+			
+			# Créer la ligne
+			var line = Line2D.new()
+			line.add_point(location.position)
+			line.add_point(target_location.position)
+			line.width = line_width
+			
+			# Couleur selon si les deux locations sont déverrouillées
+			if location.is_unlocked and target_location.is_unlocked:
+				line.default_color = line_color
+			else:
+				line.default_color = line_color_locked
+			
+			# Pointillés
+			if visual_config.has("dash_length"):
+				line.default_color.a *= 0.8  # Un peu plus transparent
+			
+			connections_container.add_child(line)
+
+# ============================================================================
+# JOUEUR
+# ============================================================================
+
+func _spawn_player() -> void:
+	"""Spawn le sprite du joueur sur la carte"""
+	
+	player = WorldMapPlayer.new()
+	player_container.add_child(player)
+	
+	# Configuration depuis Lua
+	var player_config = world_map_data.get("player", {})
+	player.setup(player_config)
+	
+	# Placer à la location de départ
+	var start_location_id = player_config.get("start_location", "")
+	
+	if locations.has(start_location_id):
+		player.set_location(locations[start_location_id])
+	else:
+		push_warning("[WorldMap] Location de départ introuvable : ", start_location_id)
+		# Fallback : première location déverrouillée
+		for loc_id in locations:
+			if locations[loc_id].is_unlocked:
+				player.set_location(locations[loc_id])
+				break
+	
+	# Signaux
+	player.movement_completed.connect(_on_player_movement_completed)
+
+# ============================================================================
+# INTERACTIONS AVEC LES LOCATIONS
+# ============================================================================
+
+func _on_location_clicked(location: WorldMapLocation) -> void:
+	"""Clic sur une location"""
+	
+	print("[WorldMap] 🖱️ Clic sur : ", location.location_name)
+	
+	# Si le joueur est déjà sur cette location
+	if player.current_location_id == location.location_id:
+		_open_location_menu(location)
+		return
+	
+	# Sinon, vérifier si on peut y aller (connexions)
+	var current_loc = locations.get(player.current_location_id)
+	
+	if not current_loc:
+		return
+	
+	var connections = current_loc.get_connections()
+	
+	if location.location_id in connections:
+		# Déplacer le joueur
+		player.move_to_location(location)
+	else:
+		show_notification("Impossible d'aller directement à " + location.location_name, 2.0)
+
+func _on_player_movement_completed() -> void:
+	"""Joueur arrivé à destination"""
+	
+	var current_loc = locations.get(player.current_location_id)
+	
+	if current_loc:
+		show_notification("Arrivée à " + current_loc.location_name, 2.0)
+		
+		# Ouvrir automatiquement le menu
+		await get_tree().create_timer(0.5).timeout
+		_open_location_menu(current_loc)
+
+func _on_location_hovered(location: WorldMapLocation) -> void:
+	"""Survol d'une location"""
+	info_label.text = location.location_name
+
+func _on_location_unhovered(_location: WorldMapLocation) -> void:
+	"""Fin de survol"""
+	info_label.text = ""
+
+# ============================================================================
+# MENU D'ACTIONS
+# ============================================================================
+
+func _open_location_menu(location: WorldMapLocation) -> void:
+	"""Ouvre le menu d'actions pour une location"""
+	
+	selected_location = location
+	
+	# Charger les données détaillées de la location
+	var location_data = WorldMapDataLoader.load_location_data(location.location_id)
+	
+	if location_data.is_empty():
+		show_notification("Aucune action disponible ici", 2.0)
+		return
+	
+	# Nettoyer le menu
+	for child in action_menu_container.get_children():
+		child.queue_free()
+	
+	# Créer les boutons d'action
+	var actions = location_data.get("actions", [])
+	
+	for action in actions:
+		# Vérifier si l'action est déverrouillée
+		if action.has("unlocked_at_step") and action.unlocked_at_step > current_step:
+			continue
+		
+		var button = Button.new()
+		button.text = action.get("label", "Action")
+		button.custom_minimum_size = Vector2(200, 40)
+		
+		# Icône si présente
+		if action.has("icon"):
+			var icon_path = action.icon
+			if ResourceLoader.exists(icon_path):
+				button.icon = load(icon_path)
+		
+		# Connexion
+		var action_data = action.duplicate()
+		button.pressed.connect(func(): _on_action_selected(action_data))
+		
+		action_menu_container.add_child(button)
+	
+	# Bouton "Fermer"
+	var close_button = Button.new()
+	close_button.text = "✕ Fermer"
+	close_button.custom_minimum_size = Vector2(200, 40)
+	close_button.pressed.connect(_close_location_menu)
+	action_menu_container.add_child(close_button)
+	
+	# Positionner et afficher
+	action_menu.popup_centered()
+
+func _close_location_menu() -> void:
+	"""Ferme le menu d'actions"""
+	action_menu.hide()
+	selected_location = null
+
+func _on_action_selected(action: Dictionary) -> void:
+	"""Action sélectionnée dans le menu"""
+	
+	print("[WorldMap] 🎬 Action sélectionnée : ", action.get("id"))
+	
+	_close_location_menu()
+	
+	match action.get("type"):
+		"exploration":
+			_handle_exploration_action(action)
+		
+		"building":
+			_handle_building_action(action)
+		
+		"shop":
+			_handle_shop_action(action)
+		
+		"quest_board":
+			_handle_quest_board_action(action)
+		
+		"custom":
+			_handle_custom_action(action)
+		
+		_:
+			show_notification("Type d'action non géré : " + action.get("type"), 2.0)
+
+func _handle_exploration_action(action: Dictionary) -> void:
+	"""Gère une action d'exploration"""
+	show_notification("Exploration (à implémenter)", 2.0)
+	
+	# TODO: Émettre un événement custom via EventBus
+	if action.has("event"):
+		var event_data = action.event
+		EventBus.emit_event(event_data.get("type"), [event_data])
+
+func _handle_building_action(action: Dictionary) -> void:
+	"""Gère l'entrée dans un bâtiment"""
+	
+	if action.has("scene"):
+		show_notification("Entrée dans " + action.get("label"), 1.5)
+		# TODO: Charger la scène
+		# EventBus.change_scene(...)
+
+func _handle_shop_action(action: Dictionary) -> void:
+	"""Gère l'ouverture d'un magasin"""
+	
+	var shop_id = action.get("shop_id", "")
+	show_notification("Magasin : " + shop_id + " (à implémenter)", 2.0)
+	
+	# TODO: Ouvrir l'interface de magasin
+
+func _handle_quest_board_action(action: Dictionary) -> void:
+	"""Gère le panneau de quêtes"""
+	show_notification("Panneau de quêtes (à implémenter)", 2.0)
+	
+	# TODO: Ouvrir l'interface de quêtes
+
+func _handle_custom_action(action: Dictionary) -> void:
+	"""Gère une action custom"""
+	
+	if action.has("event"):
+		var event_data = action.event
+		EventBus.emit_event(event_data.get("type"), [event_data])
+
+# ============================================================================
+# PROGRESSION
+# ============================================================================
+
+func set_current_step(step: int) -> void:
+	"""Définit le step de progression actuel"""
+	
+	if step == current_step:
+		return
+	
+	current_step = step
+	
+	# Mettre à jour les locations déverrouillées
+	_update_unlocked_locations()
+
+func _update_unlocked_locations() -> void:
+	"""Met à jour les locations déverrouillées"""
+	
+	for location_id in locations:
+		var location = locations[location_id]
+		var location_ref = _get_location_ref(location_id)
+		
+		if location_ref.is_empty():
+			continue
+		
+		var unlocked = location_ref.get("unlocked_at_step", 0) <= current_step
+		location.set_unlocked(unlocked)
+	
+	# Recréer les connexions
+	_refresh_connections()
+
+func _get_location_ref(location_id: String) -> Dictionary:
+	"""Récupère la référence d'une location dans les données"""
+	
+	var locations_data = world_map_data.get("locations", [])
+	
+	for loc in locations_data:
+		if loc.get("id") == location_id:
+			return loc
+	
+	return {}
+
+func _refresh_connections() -> void:
+	"""Rafraîchit les lignes de connexion"""
+	
+	# Supprimer les anciennes
+	for child in connections_container.get_children():
+		child.queue_free()
+	
+	# Recréer
+	_create_connections()
+
+# ============================================================================
+# UI CALLBACKS (existants)
 # ============================================================================
 
 func _on_party_pressed() -> void:
-	"""Ouvrir le menu de l'équipe"""
-	print("[WorldMap] Menu Équipe")
 	show_notification("Menu Équipe (à implémenter)", 2.0)
 
 func _on_inventory_pressed() -> void:
-	"""Ouvrir l'inventaire"""
-	print("[WorldMap] Inventaire")
 	show_notification("Inventaire (à implémenter)", 2.0)
 
 func _on_menu_pressed() -> void:
-	"""Ouvrir le menu pause"""
-	print("[WorldMap] Menu Pause")
 	EventBus.game_paused.emit(true)
-	show_notification("Menu Pause (à implémenter)", 2.0)
-	# EventBus.change_scene(SceneRegistry.SceneID.PAUSE_MENU)
 
 # ============================================================================
 # NOTIFICATIONS
 # ============================================================================
 
 func show_notification(message: String, duration: float = 2.0) -> void:
-	"""Affiche une notification temporaire"""
 	notification_label.text = message
 	notification_panel.visible = true
 	notification_panel.modulate.a = 0.0
@@ -285,68 +494,16 @@ func show_notification(message: String, duration: float = 2.0) -> void:
 	tween.tween_callback(func(): notification_panel.visible = false)
 
 func _on_notification_posted(message: String, type: String) -> void:
-	"""Callback pour les notifications via EventBus"""
 	var duration = 2.0
 	if type == "warning":
 		duration = 3.0
 	elif type == "error":
 		duration = 4.0
-	
 	show_notification(message, duration)
-
-# ============================================================================
-# SYSTÈME DIVIN
-# ============================================================================
-
-func _on_divine_points_gained(god_name: String, points: int) -> void:
-	"""Mise à jour des points divins"""
-	if divine_points.has(god_name):
-		divine_points[god_name] += points
-		_update_divine_ui()
-		
-		print("[WorldMap] +", points, " points pour ", god_name)
-
-func _update_divine_ui() -> void:
-	"""Met à jour l'affichage des points divins"""
-	astraeon_label.text = "⚖ Astraeon: " + str(divine_points["Astraeon"])
-	kharvul_label.text = "⚡ Kharvûl: " + str(divine_points["Kharvûl"])
-
-# ============================================================================
-# CALLBACKS EVENTBUS
-# ============================================================================
-
-func _on_battle_ended(results: Dictionary) -> void:
-	"""Réaction à la fin d'un combat"""
-	print("[WorldMap] Combat terminé : ", results)
-	
-	if results.get("victory", false):
-		show_notification("Victoire ! +" + str(results.get("rewards", {}).get("gold", 0)) + " or", 3.0)
-	elif results.get("retreat", false):
-		show_notification("Retraite réussie", 2.0)
-	else:
-		show_notification("Défaite...", 2.0)
-
-func _on_location_discovered(location_name: String) -> void:
-	"""Nouvelle location découverte"""
-	print("[WorldMap] Location découverte : ", location_name)
-	show_notification("Nouvelle zone découverte : " + location_name, 3.0)
-
-# ============================================================================
-# DEBUG
-# ============================================================================
-
-func _update_debug_info() -> void:
-	"""Met à jour les informations de debug"""
-	debug_info.text = "[DEBUG]\n"
-	debug_info.text += "Camera: (" + str(int(camera.position.x)) + ", " + str(int(camera.position.y)) + ")\n"
-	debug_info.text += "Zoom: " + str(snappedf(camera.zoom.x, 0.01)) + "\n"
-	debug_info.text += "Selected: " + selected_location
 
 # ============================================================================
 # NETTOYAGE
 # ============================================================================
 
 func _exit_tree() -> void:
-	"""Nettoyage à la fermeture de la scène"""
 	EventBus.disconnect_all(self)
-	print("[WorldMap] Scène nettoyée")
