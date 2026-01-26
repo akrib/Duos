@@ -91,7 +91,8 @@ var ai_module: AIModule3D
 #var lua_scenario_module: LuaScenarioModule
 #var lua_event_handler: LuaBattleEventHandler
 var json_scenario_module: JSONScenarioModule
-
+var battle_state_machine: BattleStateMachine
+var command_history: CommandHistory
 
 # ============================================================================
 # CONFIGURATION
@@ -140,6 +141,15 @@ var mouse_ray_length: float = 1000.0
 
 
 func _ready() -> void:
+	
+	battle_state_machine = BattleStateMachine.new()
+	battle_state_machine.debug_mode = true
+	add_child(battle_state_machine)
+	
+	# Créer l'historique de commandes
+	command_history = CommandHistory.new()
+	add_child(command_history)
+	
 	_setup_camera()
 	_connect_ui_buttons()
 	
@@ -153,6 +163,14 @@ func _ready() -> void:
 		call_deferred("initialize_battle", battle_data)
 	else:
 		push_error("[BattleMapManager3D] ❌ Aucune donnée de combat disponible")
+
+#func move_unit_with_command(unit: BattleUnit3D, target_pos: Vector2i) -> void:
+	#var command = MoveUnitCommand.new(unit, target_pos, unit_manager)
+	#command_history.execute_command(command)
+#
+#func undo_last_action() -> void:
+	#if command_history.can_undo():
+		#command_history.undo()
 
 func _setup_camera() -> void:
 	camera_rig.position = Vector3.ZERO

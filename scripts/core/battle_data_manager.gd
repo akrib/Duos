@@ -38,6 +38,15 @@ func set_battle_data(data: Dictionary) -> bool:
 	@return true si stockage réussi, false si données invalides
 	"""
 	
+	var validator = BattleDataValidator.new()
+	var result = validator.validate_battle_data(data)
+	
+	if not result.is_valid:
+		GlobalLogger.error("BATTLE_DATA", "Validation échouée : " + str(result.errors))
+		push_error("[BattleDataManager] ❌ Données invalides : ", result.errors)
+		battle_data_invalid.emit(result.errors)
+		return false
+	
 	# Validation
 	var validation_result = _validate_battle_data(data)
 	
