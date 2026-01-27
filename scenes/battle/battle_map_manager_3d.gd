@@ -62,10 +62,13 @@ enum ActionState {
 @onready var solo_button: Button = $UILayer/BattleUI/DuoSelectionPopup/VBoxContainer/SoloButton
 @onready var cancel_duo_button: Button = $UILayer/BattleUI/DuoSelectionPopup/VBoxContainer/CancelDuoButton
 
-# Labels d'info
-@onready var unit_name_label: Label = $UILayer/BattleUI/BottomBar/MarginContainer/HBoxContainer/UnitInfoPanel/VBoxContainer/UnitNameLabel
-@onready var hp_label: Label = $UILayer/BattleUI/BottomBar/MarginContainer/HBoxContainer/UnitInfoPanel/VBoxContainer/HPLabel
-@onready var stats_label: Label = $UILayer/BattleUI/BottomBar/MarginContainer/HBoxContainer/UnitInfoPanel/VBoxContainer/StatsLabel
+# Labels d'info (panel bas à droite)
+@onready var info_unit_name_label: Label = $UILayer/BattleUI/UnitInfoPanel/MarginContainer/VBoxContainer/UnitNameLabel
+@onready var info_class_label: Label = $UILayer/BattleUI/UnitInfoPanel/MarginContainer/VBoxContainer/ClassLabel
+@onready var info_hp_value: Label = $UILayer/BattleUI/UnitInfoPanel/MarginContainer/VBoxContainer/StatsGrid/HPValue
+@onready var info_atk_value: Label = $UILayer/BattleUI/UnitInfoPanel/MarginContainer/VBoxContainer/StatsGrid/ATKValue
+@onready var info_def_value: Label = $UILayer/BattleUI/UnitInfoPanel/MarginContainer/VBoxContainer/StatsGrid/DEFValue
+@onready var info_mov_value: Label = $UILayer/BattleUI/UnitInfoPanel/MarginContainer/VBoxContainer/StatsGrid/MOVValue
 @onready var turn_label: Label = $UILayer/BattleUI/TopBar/MarginContainer/HBoxContainer/TurnLabel
 @onready var phase_label: Label = $UILayer/BattleUI/TopBar/MarginContainer/HBoxContainer/PhaseLabel
 
@@ -87,9 +90,6 @@ var objective_module: ObjectiveModule
 
 var stats_tracker: BattleStatsTracker
 var ai_module: AIModule3D
-#var scenario_module: ScenarioModule
-#var lua_scenario_module: LuaScenarioModule
-#var lua_event_handler: LuaBattleEventHandler
 var json_scenario_module: JSONScenarioModule
 var battle_state_machine: BattleStateMachine
 var command_history: CommandHistory
@@ -117,7 +117,6 @@ const ATTACK_COLOR: Color = Color(1.0, 0.3, 0.3, 0.5)
 # ============================================================================
 
 var battle_data: Dictionary = {}
-#var current_phase: TurnPhase = TurnPhase.PLAYER_TURN
 var current_turn: int = 1
 var selected_unit: BattleUnit3D = null
 var duo_partner: BattleUnit3D = null
@@ -169,14 +168,6 @@ func _ready() -> void:
 		DebugOverlay.watch_variable("Unités joueur", unit_manager, "player_units")
 		DebugOverlay.watch_variable("Unités ennemies", unit_manager, "enemy_units")
 
-#func move_unit_with_command(unit: BattleUnit3D, target_pos: Vector2i) -> void:
-	#var command = MoveUnitCommand.new(unit, target_pos, unit_manager)
-	#command_history.execute_command(command)
-#
-#func undo_last_action() -> void:
-	#if command_history.can_undo():
-		#command_history.undo()
-
 func _setup_camera() -> void:
 	camera_rig.position = Vector3.ZERO
 	camera_rotation_current = 0.0
@@ -224,9 +215,6 @@ func initialize_battle(data: Dictionary) -> void:
 	await _spawn_units(data.get("player_units", []), data.get("enemy_units", []))
 	await _start_battle()
 	
-	# ✅ NOUVEAU : Nettoyer les données après usage
-	# BattleDataManager.clear_battle_data()  # Optionnel ici, déjà fait par signal battle_ended
-	
 	print("[BattleMapManager3D] ✅ Combat prêt !")
 	battle_map_ready.emit()
 	
@@ -271,12 +259,6 @@ func _initialize_modules() -> void:
 	ai_module.movement_module = movement_module
 	ai_module.action_module = action_module
 	add_child(ai_module)
-	
-	
-	#lua_event_handler = LuaBattleEventHandler.new()
-	#lua_event_handler.battle_manager = self
-	#lua_event_handler.set_lua_scenario(lua_scenario_module)
-	#add_child(lua_event_handler)
 	
 	
 	_connect_modules()
@@ -334,7 +316,6 @@ func _spawn_units(player_units: Array, enemy_units: Array) -> void:
 # ============================================================================
 
 func _start_battle() -> void:
-	# ✅ CORRECTION : S'assurer que la scène est complètement chargée
 	print("[BattleMapManager3D] 🎬 Démarrage du combat...")
 	
 	if json_scenario_module.has_intro():
@@ -400,35 +381,28 @@ func _process(delta: float) -> void:
 
 func _process_camera_rotation(delta: float) -> void:
 	if is_camera_rotating:
-		# Calculer la différence d'angle en prenant le chemin le plus court
 		var angle_diff = camera_rotation_target - camera_rotation_current
 		
-		# ✅ CORRECTION : Normaliser pour prendre le chemin le plus court
-		# Ramener angle_diff entre -180 et 180
 		while angle_diff > 180:
 			angle_diff -= 360
 		while angle_diff < -180:
 			angle_diff += 360
 		
-		# Vérifier si on est arrivé à la cible
 		if abs(angle_diff) < 0.1:
 			camera_rotation_current = camera_rotation_target
 			is_camera_rotating = false
 		else:
 			var rotation_step = CAMERA_ROTATION_SPEED * delta
 			
-			# ✅ CORRECTION : Limiter le pas pour ne pas dépasser la cible
 			if abs(angle_diff) < rotation_step:
 				camera_rotation_current = camera_rotation_target
 				is_camera_rotating = false
 			else:
-				# Tourner dans la bonne direction (selon le signe de angle_diff)
 				if angle_diff > 0:
 					camera_rotation_current += rotation_step
 				else:
 					camera_rotation_current -= rotation_step
 			
-			# ✅ CORRECTION : Normaliser camera_rotation_current entre 0 et 360
 			while camera_rotation_current >= 360:
 				camera_rotation_current -= 360
 			while camera_rotation_current < 0:
@@ -493,7 +467,6 @@ func _handle_raycast_hit(result: Dictionary) -> void:
 	if collider.has_meta("unit"):
 		var unit = collider.get_meta("unit")
 		
-		# ✅ NOUVEAU : Mettre à jour l'unité survolée
 		if hovered_unit != unit:
 			hovered_unit = unit
 			_update_info_panel()
@@ -501,7 +474,6 @@ func _handle_raycast_hit(result: Dictionary) -> void:
 		_handle_unit_click(unit)
 		return
 	
-	# ✅ NOUVEAU : Plus d'unité survolée
 	if hovered_unit != null:
 		hovered_unit = null
 		_update_info_panel()
@@ -532,7 +504,6 @@ func _handle_terrain_click(grid_pos: Vector2i) -> void:
 		return
 	
 	if movement_module.can_move_to(selected_unit, grid_pos):
-		#await movement_module.move_unit(selected_unit, grid_pos)
 		var cmd = MoveUnitCommand.new(selected_unit, grid_pos, unit_manager)
 		command_history.execute_command(cmd)
 		selected_unit.movement_used = true
@@ -562,7 +533,7 @@ func _update_info_panel() -> void:
 func _display_unit_info(unit: BattleUnit3D) -> void:
 	"""Affiche les infos d'une unité dans le panel"""
 	info_unit_name_label.text = unit.unit_name
-	info_class_label.text = "Classe: " + unit.get_meta("class", "Guerrier")  # TODO: Ajouter classe
+	info_class_label.text = "Classe: " + unit.get_meta("class", "Guerrier")
 	
 	info_hp_value.text = "%d/%d" % [unit.current_hp, unit.max_hp]
 	info_atk_value.text = str(unit.attack_power)
@@ -584,17 +555,18 @@ func _display_terrain_info() -> void:
 	# Trouver la tuile sous la souris (ou tuile par défaut)
 	var grid_pos = _get_mouse_grid_position()
 	
-	if not terrain.is_in_bounds(grid_pos):
+	# ✅ CORRECTION : terrain → terrain_module
+	if not terrain_module.is_in_bounds(grid_pos):
 		grid_pos = Vector2i(0, 0)  # Première tuile par défaut
 	
-	var tile_type = terrain.get_tile_type(grid_pos)
+	var tile_type = terrain_module.get_tile_type(grid_pos)
 	var tile_name = TerrainModule3D.TileType.keys()[tile_type]
 	
 	info_unit_name_label.text = "[Terrain]"
 	info_class_label.text = "Type: " + tile_name
 	
-	var move_cost = terrain.get_movement_cost(grid_pos)
-	var defense_bonus = terrain.get_defense_bonus(grid_pos)
+	var move_cost = terrain_module.get_movement_cost(grid_pos)
+	var defense_bonus = terrain_module.get_defense_bonus(grid_pos)
 	
 	info_hp_value.text = "Coût: " + ("∞" if move_cost == INF else str(move_cost))
 	info_atk_value.text = "--"
@@ -638,9 +610,6 @@ func _select_unit(unit: BattleUnit3D) -> void:
 	selected_unit.set_selected(true)
 	unit_selected.emit(unit)
 	
-	# Mettre à jour les infos UI
-	_update_unit_info_ui(unit)
-	
 	# Ouvrir le menu d'actions
 	_open_action_menu()
 	
@@ -655,18 +624,7 @@ func _deselect_unit() -> void:
 		unit_deselected.emit()
 		terrain_module.clear_all_highlights()
 		_close_all_menus()
-		_update_unit_info_ui(null)
 		current_action_state = ActionState.IDLE
-
-func _update_unit_info_ui(unit: BattleUnit3D) -> void:
-	if unit:
-		unit_name_label.text = unit.unit_name
-		hp_label.text = "HP: %d/%d" % [unit.current_hp, unit.max_hp]
-		stats_label.text = "ATK: %d | DEF: %d | MOV: %d" % [unit.attack_power, unit.defense_power, unit.movement_range]
-	else:
-		unit_name_label.text = "Aucune unité sélectionnée"
-		hp_label.text = "HP: --/--"
-		stats_label.text = "ATK: -- | DEF: -- | MOV: --"
 
 # ============================================================================
 # MENU D'ACTIONS
@@ -723,7 +681,6 @@ func _on_defend_pressed() -> void:
 	if not selected_unit or not selected_unit.can_act():
 		return
 	
-	# TODO: Implémenter la défense
 	print("[BattleMapManager3D] Défense (à implémenter)")
 	selected_unit.action_used = true
 	selected_unit.defense_power = int(selected_unit.defense_power * 1.5)
@@ -734,12 +691,10 @@ func _on_abilities_pressed() -> void:
 	if not selected_unit or not selected_unit.can_act():
 		return
 	
-	# TODO: Ouvrir menu des capacités
 	print("[BattleMapManager3D] Capacités (à implémenter)")
 	_close_all_menus()
 
 func _on_items_pressed() -> void:
-	# TODO: Ouvrir menu des objets
 	print("[BattleMapManager3D] Objets (à implémenter)")
 	_close_all_menus()
 
@@ -850,7 +805,6 @@ func _attack_unit(attacker: BattleUnit3D, target: BattleUnit3D) -> void:
 	if duo_partner:
 		EventBus.form_duo(attacker, duo_partner)
 		print("[BattleMapManager3D] Attaque en duo!")
-		# TODO: Appliquer les bonus de duo
 	
 	await action_module.execute_attack(attacker, target)
 	attacker.action_used = true
@@ -929,8 +883,6 @@ func _calculate_rewards(victory: bool, stats: Dictionary) -> Dictionary:
 		"exp": int(base_exp * efficiency_bonus)
 	}
 
-
-
 # ============================================================================
 # NETTOYAGE
 # ============================================================================
@@ -942,7 +894,6 @@ func _exit_tree() -> void:
 func _on_battle_state_changed(from: String, to: String) -> void:
 	print("[BattleMapManager] État : ", from, " → ", to)
 	phase_label.text = "Phase: " + to
-
 
 func _on_undo_pressed() -> void:
 	if command_history.can_undo():
