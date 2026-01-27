@@ -161,3 +161,38 @@ func _exit_tree() -> void:
 	"""Nettoyage à la fermeture"""
 	EventBus.disconnect_all(self)
 	
+func _normalize_battle_data(data: Dictionary) -> void:
+	# Player units
+	if data.has("player_units"):
+		for unit in data.player_units:
+			# HP → int
+			unit.current_hp = int(unit.current_hp)
+			unit.max_hp = int(unit.max_hp)
+
+			# Position [x, y] → Vector2i
+			if unit.has("position") and unit.position is Array and unit.position.size() == 2:
+				unit.position = Vector2i(
+					int(unit.position[0]),
+					int(unit.position[1])
+				)
+
+	# Enemy units
+	if data.has("enemy_units"):
+		for unit in data.enemy_units:
+			unit.current_hp = int(unit.current_hp)
+			unit.max_hp = int(unit.max_hp)
+
+			if unit.has("position") and unit.position is Array and unit.position.size() == 2:
+				unit.position = Vector2i(
+					int(unit.position[0]),
+					int(unit.position[1])
+				)
+
+	# Obstacles
+	if data.has("terrain_obstacles"):
+		for obs in data.terrain_obstacles:
+			if obs.has("position") and obs.position is Array and obs.position.size() == 2:
+				obs.position = Vector2i(
+					int(obs.position[0]),
+					int(obs.position[1])
+				)
