@@ -1,6 +1,6 @@
 [gd_scene load_steps=3 format=3 uid="uid://4bj7etivw784"]
 
-[ext_resource type="Script" uid="uid://di4ee2clqc84g" path="res://scenes/battle/battle_map_manager_3d.gd" id="1_manager"]
+[ext_resource type="Script" uid="uid://b40h4cjwiukga" path="res://scenes/battle/battle_map_manager_3d.gd" id="1_manager"]
 [ext_resource type="PackedScene" uid="uid://byp8xytm75beo" path="res://scenes/ui/dialogue_box.tscn" id="2_x1cvm"]
 
 [node name="BattleMap3D" type="Node3D"]
@@ -95,9 +95,30 @@ theme_override_constants/margin_bottom = 10
 layout_mode = 2
 theme_override_constants/separation = 20
 
+[node name="UnitInfoPanel" type="PanelContainer" parent="UILayer/BattleUI/BottomBar/MarginContainer/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="VBoxContainer" type="VBoxContainer" parent="UILayer/BattleUI/BottomBar/MarginContainer/HBoxContainer/UnitInfoPanel"]
+layout_mode = 2
+
+[node name="UnitNameLabel" type="Label" parent="UILayer/BattleUI/BottomBar/MarginContainer/HBoxContainer/UnitInfoPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Aucune unité sélectionnée"
+
+[node name="HPLabel" type="Label" parent="UILayer/BattleUI/BottomBar/MarginContainer/HBoxContainer/UnitInfoPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "HP: --/--"
+
+[node name="StatsLabel" type="Label" parent="UILayer/BattleUI/BottomBar/MarginContainer/HBoxContainer/UnitInfoPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "ATK: -- | DEF: -- | MOV: --"
+
 [node name="ButtonsContainer" type="HBoxContainer" parent="UILayer/BattleUI/BottomBar/MarginContainer/HBoxContainer"]
 layout_mode = 2
-size_flags_horizontal = 8
 theme_override_constants/separation = 10
 
 [node name="EndTurnButton" type="Button" parent="UILayer/BattleUI/BottomBar/MarginContainer/HBoxContainer/ButtonsContainer"]
@@ -126,8 +147,50 @@ text = "↩️ Annuler"
 
 [node name="ActionPopup" type="PopupPanel" parent="UILayer/BattleUI"]
 
+[node name="VBoxContainer" type="VBoxContainer" parent="UILayer/BattleUI/ActionPopup"]
+offset_left = 4.0
+offset_top = 4.0
+offset_right = 96.0
+offset_bottom = 96.0
+theme_override_constants/separation = 10
+
+[node name="MoveButton" type="Button" parent="UILayer/BattleUI/ActionPopup/VBoxContainer"]
+custom_minimum_size = Vector2(180, 40)
+layout_mode = 2
+text = "👣 Déplacer"
+
+[node name="AttackButton" type="Button" parent="UILayer/BattleUI/ActionPopup/VBoxContainer"]
+custom_minimum_size = Vector2(180, 40)
+layout_mode = 2
+text = "⚔ Attaquer"
+
+[node name="DefendButton" type="Button" parent="UILayer/BattleUI/ActionPopup/VBoxContainer"]
+custom_minimum_size = Vector2(180, 40)
+layout_mode = 2
+text = "🛡 Défendre"
+
+[node name="AbilitiesButton" type="Button" parent="UILayer/BattleUI/ActionPopup/VBoxContainer"]
+custom_minimum_size = Vector2(180, 40)
+layout_mode = 2
+text = "✨ Capacités"
+
+[node name="ItemsButton" type="Button" parent="UILayer/BattleUI/ActionPopup/VBoxContainer"]
+custom_minimum_size = Vector2(180, 40)
+layout_mode = 2
+text = "🎒 Objets"
+
+[node name="WaitActionButton" type="Button" parent="UILayer/BattleUI/ActionPopup/VBoxContainer"]
+custom_minimum_size = Vector2(180, 40)
+layout_mode = 2
+text = "⏸ Passer le tour"
+
+[node name="CancelButton" type="Button" parent="UILayer/BattleUI/ActionPopup/VBoxContainer"]
+custom_minimum_size = Vector2(180, 40)
+layout_mode = 2
+text = "✕ Annuler"
+
 [node name="UnitInfoPanel" type="PanelContainer" parent="UILayer/BattleUI"]
-anchors_preset = 3
+layout_mode = 0
 anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
@@ -206,55 +269,13 @@ text = "MOV:"
 layout_mode = 2
 text = "--"
 
-[node name="VBoxContainer" type="VBoxContainer" parent="UILayer/BattleUI/ActionPopup"]
-offset_left = 4.0
-offset_top = 4.0
-offset_right = 184.0
-offset_bottom = 344.0
-theme_override_constants/separation = 10
-
-[node name="MoveButton" type="Button" parent="UILayer/BattleUI/ActionPopup/VBoxContainer"]
-custom_minimum_size = Vector2(180, 40)
-layout_mode = 2
-text = "👣 Déplacer"
-
-[node name="AttackButton" type="Button" parent="UILayer/BattleUI/ActionPopup/VBoxContainer"]
-custom_minimum_size = Vector2(180, 40)
-layout_mode = 2
-text = "⚔ Attaquer"
-
-[node name="DefendButton" type="Button" parent="UILayer/BattleUI/ActionPopup/VBoxContainer"]
-custom_minimum_size = Vector2(180, 40)
-layout_mode = 2
-text = "🛡 Défendre"
-
-[node name="AbilitiesButton" type="Button" parent="UILayer/BattleUI/ActionPopup/VBoxContainer"]
-custom_minimum_size = Vector2(180, 40)
-layout_mode = 2
-text = "✨ Capacités"
-
-[node name="ItemsButton" type="Button" parent="UILayer/BattleUI/ActionPopup/VBoxContainer"]
-custom_minimum_size = Vector2(180, 40)
-layout_mode = 2
-text = "🎒 Objets"
-
-[node name="WaitActionButton" type="Button" parent="UILayer/BattleUI/ActionPopup/VBoxContainer"]
-custom_minimum_size = Vector2(180, 40)
-layout_mode = 2
-text = "⏸ Passer le tour"
-
-[node name="CancelButton" type="Button" parent="UILayer/BattleUI/ActionPopup/VBoxContainer"]
-custom_minimum_size = Vector2(180, 40)
-layout_mode = 2
-text = "✕ Annuler"
-
 [node name="DuoSelectionPopup" type="PopupPanel" parent="UILayer/BattleUI"]
 
 [node name="VBoxContainer" type="VBoxContainer" parent="UILayer/BattleUI/DuoSelectionPopup"]
 offset_left = 4.0
 offset_top = 4.0
-offset_right = 372.0
-offset_bottom = 142.0
+offset_right = 96.0
+offset_bottom = 96.0
 theme_override_constants/separation = 10
 
 [node name="TitleLabel" type="Label" parent="UILayer/BattleUI/DuoSelectionPopup/VBoxContainer"]
