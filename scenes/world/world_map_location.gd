@@ -29,9 +29,7 @@ var area: Area2D
 # ============================================================================
 
 func _ready() -> void:
-	# ✅ CORRECTION: Ne rien faire si déjà créé dans setup()
-	if not sprite:
-		_create_visuals()
+	pass
 
 func setup(data: Dictionary) -> void:
 	"""Configure la location avec ses données"""
@@ -49,22 +47,37 @@ func setup(data: Dictionary) -> void:
 			position = Vector2(pos.get("x", 0), pos.get("y", 0))
 	
 	# Déverrouillage
-	is_unlocked = true  # Sera géré par la world_map
+	is_unlocked = true
 	
-	# ✅ CORRECTION: Créer les visuels AVANT de les mettre à jour
-	if not sprite:
+	# ✅ Créer les visuels MAINTENANT (avec les bonnes données)
+	if not sprite:  # Seulement si pas déjà créés
 		_create_visuals()
 	
 	_update_visuals()
-
+	
+	print("[WorldMapLocation] 📍 Setup terminé : ", location_name, " à ", position)
+	
 func _create_visuals() -> void:
 	"""Crée les éléments visuels"""
+	
+	# ✅ Rectangle de debug avec Polygon2D
+	var debug_rect = Polygon2D.new()
+	debug_rect.polygon = PackedVector2Array([
+		Vector2(-32, -32),
+		Vector2(32, -32),
+		Vector2(32, 32),
+		Vector2(-32, 32)
+	])
+	debug_rect.color = Color(1, 0, 0, 0.3)  # Rouge transparent
+	add_child(debug_rect)
+	print("[WorldMapLocation] 🔴 Rectangle debug créé pour ", location_name)
 	
 	# Sprite principal avec texture de rond jaune
 	sprite = Sprite2D.new()
 	sprite.centered = true
-	sprite.texture = _create_yellow_circle_texture()  # ✅ NOUVEAU
+	sprite.texture = _create_yellow_circle_texture()
 	add_child(sprite)
+	print("[WorldMapLocation] 🟡 Sprite créé pour ", location_name)
 	
 	# Label avec le nom
 	label = Label.new()
@@ -73,26 +86,28 @@ func _create_visuals() -> void:
 	label.custom_minimum_size = Vector2(100, 0)
 	label.add_theme_font_size_override("font_size", 16)
 	add_child(label)
+	print("[WorldMapLocation] 🏷️ Label créé pour ", location_name)
 	
 	# Zone de collision pour le clic
 	area = Area2D.new()
-	
-	area.collision_layer = 2  # Layer 2 pour les locations
-	area.collision_mask = 0   # Ne détecte rien (juste pour être cliquée)
-	area.input_pickable = true  # ✅ CRITIQUE : Permettre l'input
+	area.collision_layer = 2
+	area.collision_mask = 0
+	area.input_pickable = true
 	
 	var collision = CollisionShape2D.new()
 	var shape = CircleShape2D.new()
-	shape.radius = 32
+	shape.radius = 64  # ← Plus gros pour debug
 	collision.shape = shape
 	area.add_child(collision)
 	add_child(area)
+	print("[WorldMapLocation] 📍 Area2D créée pour ", location_name, " avec radius=64")
 	
 	# Signaux
 	area.input_event.connect(_on_area_input_event)
 	area.mouse_entered.connect(_on_mouse_entered)
 	area.mouse_exited.connect(_on_mouse_exited)
-
+	print("[WorldMapLocation] 🔗 Signaux connectés pour ", location_name)
+	
 # ✅ NOUVELLE FONCTION : Créer un rond jaune programmatiquement
 func _create_yellow_circle_texture() -> ImageTexture:
 	"""Crée une texture de cercle jaune"""
@@ -172,9 +187,20 @@ func set_unlocked(unlocked: bool) -> void:
 # ============================================================================
 
 func _on_area_input_event(_viewport: Node, event: InputEvent, _shape_idx: int) -> void:
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		if is_unlocked:
-			clicked.emit(self)
+	print("[WorldMapLocation] 🖱️ Input event reçu sur : ", location_name)
+	print("  - Type event: ", event.get_class())
+	print("  - is_unlocked: ", is_unlocked)
+	
+	if event is InputEventMouseButton:
+		print("  - MouseButton: ", event.button_index, " pressed: ", event.pressed)
+		
+		if event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			print("  - Clic gauche détecté!")
+			if is_unlocked:
+				print("  - Location déverrouillée, émission signal clicked")
+				clicked.emit(self)
+			else:
+				print("  - ❌ Location verrouillée, pas de signal")
 
 func _on_mouse_entered() -> void:
 	if is_unlocked:

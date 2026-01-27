@@ -93,6 +93,7 @@ func _create_action_menu() -> void:
 	action_menu.add_child(margin)
 	
 	action_menu_container = VBoxContainer.new()
+	action_menu_container.custom_minimum_size = Vector2(220, 100) 
 	action_menu_container.add_theme_constant_override("separation", 5)
 	margin.add_child(action_menu_container)
 	
@@ -150,6 +151,11 @@ func _create_locations() -> void:
 	
 	for location_data in locations_data:
 		var location = WorldMapLocation.new()
+		
+		# ✅ CORRECTION : Ajouter AVANT de setup
+		locations_container.add_child(location)
+		
+		# Maintenant setup (le node est dans la scène)
 		location.setup(location_data)
 		
 		# Vérifier si déverrouillée
@@ -161,8 +167,10 @@ func _create_locations() -> void:
 		location.hovered.connect(_on_location_hovered)
 		location.unhovered.connect(_on_location_unhovered)
 		
-		locations_container.add_child(location)
 		locations[location_data.id] = location
+		
+		# ✅ DEBUG
+		print("[WorldMap] 🎯 Location créée : ", location.location_name, " à ", location.position, " visible=", location.visible)
 
 # ============================================================================
 # GÉNÉRATION DES CONNEXIONS (CORRIGÉ)

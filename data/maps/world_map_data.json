@@ -25,7 +25,7 @@
 	  "icon": "res://assets/icons/locations/forest.png",
 	  "scale": 2.5,
 	  "color": {"r": 0.2, "g": 0.5, "b": 0.2, "a": 1.0},
-	  "unlocked_at_step": 1,
+	  "unlocked_at_step": 0,
 	  "connections": ["starting_village", "capital_city"]
 	},
 	{
