@@ -7,15 +7,15 @@ func _init() -> void:
 	var rule_name = ValidationRule.new("name", TYPE_STRING, true)
 	add_rule(rule_name)
 
-	# ✅ CORRECTION : Accepter TYPE_FLOAT au lieu de TYPE_INT
-	var rule_current_hp = ValidationRule.new("current_hp", TYPE_FLOAT, true)
-	rule_current_hp.min_value = 1.0
-	rule_current_hp.max_value = 9999.0
+	# ✅ CORRECTION : Accepter TYPE_INT car les HP sont des entiers dans le jeu
+	var rule_current_hp = ValidationRule.new("current_hp", TYPE_INT, true)
+	rule_current_hp.min_value = 1  # ← Aussi en int
+	rule_current_hp.max_value = 9999
 	add_rule(rule_current_hp)
 	
-	var rule_max_hp = ValidationRule.new("max_hp", TYPE_FLOAT, true)
-	rule_max_hp.min_value = 1.0
-	rule_max_hp.max_value = 9999.0
+	var rule_max_hp = ValidationRule.new("max_hp", TYPE_INT, true)
+	rule_max_hp.min_value = 1  # ← Aussi en int
+	rule_max_hp.max_value = 9999
 	add_rule(rule_max_hp)
 
 	var rule_position = ValidationRule.new("position", TYPE_VECTOR2I, true)

@@ -25,7 +25,7 @@ func _ready() -> void:
 	
 	# Style
 	label_3d.font_size = 48
-	label_3d.modulate = Color.RED
+	label_3d.modulate = Color.YELLOW
 	label_3d.text = str(damage_value)
 	
 	start_position = global_position
