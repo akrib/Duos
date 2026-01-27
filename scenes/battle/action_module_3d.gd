@@ -61,10 +61,33 @@ func execute_attack(attacker: BattleUnit3D, target: BattleUnit3D) -> void:
 	var damage = calculate_damage(attacker, target)
 	target.take_damage(damage)
 	
+	# ✅ NOUVEAU : Spawner le nombre de dégâts
+	_spawn_damage_number(target, damage)
+	
 	damage_dealt.emit(target, damage)
 	action_executed.emit(attacker, target, "attack")
 	
 	EventBus.attack(attacker, target, damage)
+
+# ✅ NOUVELLE FONCTION
+func _spawn_damage_number(target: BattleUnit3D, damage: int) -> void:
+	"""Crée un nombre de dégâts animé au-dessus de la cible"""
+	var damage_number = preload("res://scenes/battle/damage_number.gd").new()
+	
+	# Position de spawn : au-dessus de l'unité
+	var spawn_pos = target.global_position + Vector3(0, 2.0, 0)
+	
+	# Offset aléatoire pour éviter superposition
+	var random_offset = Vector3(
+		randf_range(-0.5, 0.5),
+		0,
+		randf_range(-0.5, 0.5)
+	)
+	
+	damage_number.setup(damage, spawn_pos, random_offset)
+	
+	# Ajouter à la scène
+	target.get_parent().add_child(damage_number)
 
 func calculate_damage(attacker: BattleUnit3D, target: BattleUnit3D) -> int:
 	var base_damage = attacker.attack_power

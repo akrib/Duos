@@ -9,6 +9,7 @@ script = ExtResource("1_world_map")
 [node name="Background" type="ColorRect" parent="."]
 offset_right = 1920.0
 offset_bottom = 1080.0
+mouse_filter = 2
 color = Color(0.15, 0.2, 0.15, 1)
 
 [node name="Camera2D" type="Camera2D" parent="."]

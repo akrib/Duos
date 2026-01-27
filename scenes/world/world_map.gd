@@ -474,6 +474,9 @@ func _on_action_selected(action: Dictionary) -> void:
 	_close_location_menu()
 	
 	match action.get("type"):
+		"battle":  # ← NOUVEAU
+			_handle_battle_action(action)
+		
 		"exploration":
 			_handle_exploration_action(action)
 		
@@ -485,7 +488,10 @@ func _on_action_selected(action: Dictionary) -> void:
 		
 		"quest_board":
 			_handle_quest_board_action(action)
-		
+			
+		"dialogue":  # ← NOUVEAU (bonus)
+			_handle_dialogue_action(action)
+			
 		"custom":
 			_handle_custom_action(action)
 		
@@ -529,6 +535,188 @@ func _handle_custom_action(action: Dictionary) -> void:
 	if action.has("event"):
 		var event_data = action.event
 		EventBus.emit_event(event_data.get("type"), [event_data])
+
+
+# ============================================================================
+# GESTION DES ACTIONS - AJOUTS
+# ============================================================================
+
+func _handle_battle_action(action: Dictionary) -> void:
+	"""Gère le lancement d'un combat"""
+	
+	var battle_id = action.get("battle_id", "")
+	
+	if battle_id == "":
+		show_notification("ID de combat manquant", 2.0)
+		return
+	
+	print("[WorldMap] ⚔️ Lancement du combat : ", battle_id)
+	
+	# Charger les données du combat
+	var battle_data_path = "res://data/battles/" + battle_id + ".json"
+	
+	if not FileAccess.file_exists(battle_data_path):
+		show_notification("Combat introuvable : " + battle_id, 2.0)
+		push_error("[WorldMap] Fichier de combat introuvable : ", battle_data_path)
+		return
+	
+	# Charger le JSON
+	var file = FileAccess.open(battle_data_path, FileAccess.READ)
+	var json_string = file.get_as_text()
+	file.close()
+	
+	var json = JSON.new()
+	var error = json.parse(json_string)
+	
+	if error != OK:
+		show_notification("Erreur de chargement du combat", 2.0)
+		push_error("[WorldMap] Erreur JSON pour : ", battle_data_path)
+		return
+	
+	var battle_data = json.data
+	
+	# Envoyer les données au BattleDataManager
+	var converted_data = _convert_battle_json_to_godot_types(battle_data)
+	BattleDataManager.set_battle_data(converted_data)
+	
+	# Notification
+	var battle_name = battle_data.get("name", "Combat")
+	show_notification("Chargement : " + battle_name, 1.5)
+	
+	# Attendre un peu puis charger la scène de combat
+	await get_tree().create_timer(1.5).timeout
+	
+	# Changer vers la scène de combat 3D
+	#EventBus.music_change_requested.emit("res://audio/music/battle_theme.ogg")
+	EventBus.change_scene(SceneRegistry.SceneID.BATTLE)
+
+func _handle_dialogue_action(action: Dictionary) -> void:
+	"""Gère une action de dialogue"""
+	
+	var dialogue_id = action.get("dialogue_id", "")
+	
+	if dialogue_id == "":
+		show_notification("ID de dialogue manquant", 2.0)
+		return
+	
+	print("[WorldMap] 💬 Lancement du dialogue : ", dialogue_id)
+	
+	# Charger le dialogue
+	var dialogue_loader = DialogueDataLoader.new()
+	var dialogue_data_dict = dialogue_loader.load_dialogue(dialogue_id)
+	
+	if dialogue_data_dict.is_empty():
+		show_notification("Dialogue introuvable : " + dialogue_id, 2.0)
+		return
+	
+	# Convertir en DialogueData (fonction helper déjà existante dans intro_dialogue.gd)
+	var dialogue_data = _convert_dialogue_dict_to_data(dialogue_data_dict)
+	
+	# Récupérer la DialogueBox depuis l'UI
+	var dialogue_box = $UI/DialogueBox
+	
+	if not dialogue_box:
+		push_error("[WorldMap] DialogueBox introuvable dans l'UI")
+		return
+	
+	# Démarrer le dialogue
+	Dialogue_Manager.start_dialogue(dialogue_data, dialogue_box)
+
+func _convert_battle_json_to_godot_types(battle_data: Dictionary) -> Dictionary:
+	var converted = battle_data.duplicate(true)
+	
+	# Convertir les unités du joueur
+	if converted.has("player_units"):
+		converted["player_units"] = _convert_units_array(converted["player_units"])
+	
+	# Convertir les unités ennemies
+	if converted.has("enemy_units"):
+		converted["enemy_units"] = _convert_units_array(converted["enemy_units"])
+	
+	# Convertir les obstacles du terrain
+	if converted.has("terrain_obstacles"):
+		converted["terrain_obstacles"] = _convert_obstacles_array(converted["terrain_obstacles"])
+	
+	# Convertir grid_size si c'est un Dictionary
+	if converted.has("grid_size") and converted["grid_size"] is Dictionary:
+		var grid = converted["grid_size"]
+		if grid.has("width") and grid.has("height"):
+			converted["grid_size"] = Vector2i(int(grid["width"]), int(grid["height"]))
+	
+	return converted
+
+## Convertit un tableau d'unités (player ou enemy)
+func _convert_units_array(units: Array) -> Array:
+	var converted_units: Array = []
+	
+	for unit in units:
+		if unit is Dictionary:
+			var converted_unit = unit.duplicate(true)
+			
+			# Convertir hp (float → int)
+			if converted_unit.has("hp"):
+				converted_unit["hp"] = int(converted_unit["hp"])
+			
+			# Convertir position (Array → Vector2i)
+			if converted_unit.has("position"):
+				var pos = converted_unit["position"]
+				if pos is Array and pos.size() >= 2:
+					converted_unit["position"] = Vector2i(int(pos[0]), int(pos[1]))
+			
+			# Convertir stats si nécessaire
+			if converted_unit.has("stats") and converted_unit["stats"] is Dictionary:
+				var stats = converted_unit["stats"]
+				for key in stats.keys():
+					if stats[key] is float:
+						stats[key] = int(stats[key])
+			
+			converted_units.append(converted_unit)
+	
+	return converted_units
+
+## Convertit un tableau d'obstacles
+func _convert_obstacles_array(obstacles: Array) -> Array:
+	var converted_obstacles: Array = []
+	
+	for obstacle in obstacles:
+		if obstacle is Dictionary:
+			var converted_obstacle = obstacle.duplicate(true)
+			
+			# Convertir position (Array → Vector2i)
+			if converted_obstacle.has("position"):
+				var pos = converted_obstacle["position"]
+				if pos is Array and pos.size() >= 2:
+					converted_obstacle["position"] = Vector2i(int(pos[0]), int(pos[1]))
+			
+			converted_obstacles.append(converted_obstacle)
+	
+	return converted_obstacles
+
+func _convert_dialogue_dict_to_data(lua_dict: Dictionary) -> DialogueData:
+	"""Convertit un dictionnaire de dialogue en DialogueData"""
+	
+	var dialogue = DialogueData.new(lua_dict.get("id", ""))
+	
+	dialogue.category = lua_dict.get("category", "general")
+	dialogue.priority = lua_dict.get("priority", 0)
+	dialogue.skippable = lua_dict.get("skippable", true)
+	dialogue.pausable = lua_dict.get("pausable", true)
+	
+	# Traiter les séquences
+	if lua_dict.has("sequences"):
+		for sequence in lua_dict.sequences:
+			if sequence.has("lines"):
+				for line in sequence.lines:
+					dialogue.add_line(
+						line.get("speaker", ""),
+						line.get("text", ""),
+						{
+							"emotion": line.get("emotion", "neutral"),
+							"auto_advance": false
+						}
+					)
+	
+	return dialogue
 
 # ============================================================================
 # PROGRESSION

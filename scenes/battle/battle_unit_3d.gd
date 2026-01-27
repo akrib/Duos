@@ -220,7 +220,8 @@ func _create_hp_bar_with_team_indicator() -> void:
 	var bg_material = StandardMaterial3D.new()
 	bg_material.albedo_color = Color(0.2, 0.2, 0.2)
 	bg_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	bg_material.cull_mode = BaseMaterial3D.CULL_DISABLED  # Visible des deux côtés
+	bg_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	bg_material.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED  # ✅ AJOUTÉ
 	hp_bar_bg.set_surface_override_material(0, bg_material)
 	hp_bar_bg.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	hp_bar_container.add_child(hp_bar_bg)
@@ -228,59 +229,65 @@ func _create_hp_bar_with_team_indicator() -> void:
 	# ========== BARRE DE HP AVANT-PLAN (verte) ==========
 	hp_bar_3d = MeshInstance3D.new()
 	var box = BoxMesh.new()
-	box.size = Vector3(tile_size * 0.8, 0.06, 0.03)  # ← Plus épais en Z pour être bien visible
+	box.size = Vector3(tile_size * 0.8, 0.06, 0.04)  # ✅ Plus épais en Z
 	hp_bar_3d.mesh = box
 	
-	# ✅ CORRECTION : Position devant le fond (Z plus grand)
-	hp_bar_3d.position.z = 0.025  # ← Bien devant le fond (0.03/2 + margin)
+	# ✅ CORRECTION : Position devant le fond
+	hp_bar_3d.position.z = 0.03  # Devant le fond
 	
-	# ✅ CORRECTION : Material vert avec culling désactivé
+	# ✅ CORRECTION : Material vert avec rendering_mode approprié
 	var material = StandardMaterial3D.new()
 	material.albedo_color = Color.GREEN
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.cull_mode = BaseMaterial3D.CULL_DISABLED  # Visible des deux côtés
-	material.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS  # Toujours dessiner
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	material.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED  # ✅ AJOUTÉ
+	material.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
+	material.no_depth_test = false  # ✅ AJOUTÉ
 	hp_bar_3d.set_surface_override_material(0, material)
 	hp_bar_3d.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	
+	# ✅ CRITIQUE : Render priority pour garantir l'ordre
+	hp_bar_3d.sorting_offset = 0.1  # ✅ AJOUTÉ : Priorité de rendu
+	
 	hp_bar_container.add_child(hp_bar_3d)
 	
-	# ========== ✅ TEAM INDICATOR (cube enfant de la barre) ==========
+	# ========== TEAM INDICATOR ==========
 	team_indicator = MeshInstance3D.new()
 	var indicator_box = BoxMesh.new()
-	indicator_box.size = Vector3(0.12, 0.12, 0.03)
+	indicator_box.size = Vector3(0.12, 0.12, 0.04)  # ✅ Plus épais
 	team_indicator.mesh = indicator_box
 	
-	# Position en bas à droite de la barre de vie
 	var bar_width = tile_size * 0.8
 	var bar_height = 0.08
 	team_indicator.position = Vector3(
-		bar_width / 2 + 0.08,  # À droite de la barre
-		-bar_height / 2,        # En bas de la barre
-		0.025                   # Devant
+		bar_width / 2 + 0.08,
+		-bar_height / 2,
+		0.03  # ✅ Même Z que la barre verte
 	)
 	
-	# Material selon l'équipe
 	var team_material = StandardMaterial3D.new()
 	team_material.albedo_color = Color.GREEN if is_player_unit else Color.RED
 	team_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	team_material.emission_enabled = true
 	team_material.emission = team_material.albedo_color * 0.5
 	team_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	team_material.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED  # ✅ AJOUTÉ
 	team_indicator.set_surface_override_material(0, team_material)
 	team_indicator.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	
-	# ✅ Ajouter comme enfant de hp_bar_container (pas un container séparé)
 	hp_bar_container.add_child(team_indicator)
-
+	
 func _process(_delta: float) -> void:
-	"""Faire tourner la barre HP (avec team indicator) vers la caméra"""
+	"""Faire tourner la barre HP vers la caméra"""
 	var camera = get_viewport().get_camera_3d()
 	if not camera:
 		return
 	
-	# Billboard manuel pour la barre HP et son team indicator
+	# ✅ CORRECTION : Copier la rotation de la caméra au lieu de look_at
 	if hp_bar_container:
-		hp_bar_container.look_at(camera.global_position, Vector3.UP)
+		# Billboard pur : copier la rotation globale de la caméra
+		var cam_basis = camera.global_transform.basis
+		hp_bar_container.global_transform.basis = cam_basis
 
 func _create_collision() -> void:
 	"""Crée une collision pour le raycasting"""
@@ -413,13 +420,16 @@ func _update_hp_bar() -> void:
 	
 	var hp_percent = get_hp_percentage()
 	
-	# ✅ Redimensionner la barre
+	# ✅ CORRECTION : Redimensionner correctement
 	var box_mesh = hp_bar_3d.mesh as BoxMesh
 	if box_mesh:
-		box_mesh.size.x = tile_size * 0.8 * hp_percent
-	
-	# ✅ Déplacer pour garder aligné à gauche
-	hp_bar_3d.position.x = -(tile_size * 0.8 * (1.0 - hp_percent)) / 2.0
+		var max_width = tile_size * 0.8
+		var current_width = max_width * hp_percent
+		box_mesh.size.x = current_width
+		
+		# ✅ CORRECTION : Ancrer à gauche
+		var offset = (max_width - current_width) / 2.0
+		hp_bar_3d.position.x = -offset
 	
 	# ✅ Changer la couleur selon le % de HP
 	var material = hp_bar_3d.get_surface_override_material(0) as StandardMaterial3D
@@ -430,7 +440,7 @@ func _update_hp_bar() -> void:
 			material.albedo_color = Color.YELLOW
 		else:
 			material.albedo_color = Color.RED
-
+			
 func _update_visuals() -> void:
 	"""Met à jour tous les visuels"""
 	if not can_do_anything():

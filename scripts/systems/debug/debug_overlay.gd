@@ -28,7 +28,7 @@ func _create_ui() -> void:
 	scroll.add_child(info_label)
 
 func _input(event: InputEvent) -> void:
-	if event.is_action_pressed("ui_text_toggle_auto"):  # F3 par exemple
+	if event.is_action_pressed("debug_toggle"):  # ✅ Changé de ui_text_toggle_auto à debug_toggle
 		toggle_visibility()
 
 func toggle_visibility() -> void:

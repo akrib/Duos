@@ -19,6 +19,10 @@ var transitions: Dictionary = {}  # from_state -> [allowed_to_states]
 var is_active: bool = true
 var debug_mode: bool = false
 
+var current_state_name: String:
+	get:
+		return current_state
+
 # ============================================================================
 # INITIALISATION
 # ============================================================================

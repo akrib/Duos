@@ -2,6 +2,8 @@ extends StateMachine
 class_name BattleStateMachine
 ## State Machine pour le système de combat
 
+signal battle_phase_changed(old_phase: String, new_phase: String)
+
 enum State {
 	INTRO,
 	PLAYER_TURN,
@@ -39,13 +41,14 @@ func _define_transitions() -> void:
 # Callbacks des états
 func _on_intro_enter() -> void:
 	print("[BattleStateMachine] 🎬 Intro")
+	battle_phase_changed.emit("", "INTRO")  # ✅ AJOUTER
 
 func _on_intro_exit() -> void:
 	pass
 
 func _on_player_turn_enter() -> void:
-	print("[BattleStateMachine] 👤 Tour du joueur")
-	EventBus.emit_signal("battle_phase_changed", "PLAYER_TURN")
+	print("[BattleStateMachine] ▶️ Tour du Joueur")
+	battle_phase_changed.emit(get_previous_state(), "PLAYER_TURN")
 
 func _on_player_turn_exit() -> void:
 	pass
@@ -55,22 +58,23 @@ func _on_player_turn_process(delta: float) -> void:
 	pass
 
 func _on_enemy_turn_enter() -> void:
-	print("[BattleStateMachine] 👹 Tour ennemi")
-	EventBus.emit_signal("battle_phase_changed", "ENEMY_TURN")
+	print("[BattleStateMachine] 👾 Tour des Ennemis")
+	battle_phase_changed.emit(get_previous_state(), "ENEMY_TURN") 
 
 func _on_enemy_turn_exit() -> void:
 	pass
 
 func _on_animation_enter() -> void:
 	print("[BattleStateMachine] 🎞️ Animation")
+	battle_phase_changed.emit(get_previous_state(), "ANIMATION")
 
 func _on_animation_exit() -> void:
 	pass
 
 func _on_victory_enter() -> void:
-	print("[BattleStateMachine] 🎉 VICTOIRE")
-	EventBus.emit_signal("battle_ended", {"victory": true})
+	print("[BattleStateMachine] 🎉 Victoire!")
+	battle_phase_changed.emit(get_previous_state(), "VICTORY")
 
 func _on_defeat_enter() -> void:
-	print("[BattleStateMachine] 💀 DÉFAITE")
-	EventBus.emit_signal("battle_ended", {"victory": false})
+	print("[BattleStateMachine] 💀 Défaite")
+	battle_phase_changed.emit(get_previous_state(), "DEFEAT")

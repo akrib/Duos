@@ -78,7 +78,7 @@ enum ActionState {
 # ============================================================================
 # MODULES
 # ============================================================================
-
+var hovered_unit: BattleUnit3D = null
 var terrain_module: TerrainModule3D
 var unit_manager: UnitManager3D
 var movement_module: MovementModule3D
@@ -141,7 +141,6 @@ var mouse_ray_length: float = 1000.0
 
 
 func _ready() -> void:
-	undo_button.pressed.connect(_on_undo_pressed)
 	battle_state_machine = BattleStateMachine.new()
 	battle_state_machine.debug_mode = true
 	add_child(battle_state_machine)
@@ -201,7 +200,8 @@ func _connect_ui_buttons() -> void:
 	
 	# Boutons de contrôle
 	end_turn_button.pressed.connect(_on_end_turn_pressed)
-
+	undo_button.pressed.connect(_on_undo_pressed)
+	
 func initialize_battle(data: Dictionary) -> void:
 	if is_battle_active:
 		push_warning("[BattleMapManager3D] Combat déjà en cours")
@@ -396,6 +396,7 @@ func _on_end_turn_pressed() -> void:
 
 func _process(delta: float) -> void:
 	_process_camera_rotation(delta)
+	_update_info_panel()
 
 func _process_camera_rotation(delta: float) -> void:
 	if is_camera_rotating:
@@ -452,7 +453,7 @@ func rotate_camera(degrees: float) -> void:
 	is_camera_rotating = true
 
 func _input(event: InputEvent) -> void:
-	if not is_battle_active or  battle_state_machine.current_state_name != TurnPhase.PLAYER_TURN:
+	if not is_battle_active or  battle_state_machine.current_state  != "PLAYER_TURN":
 		return
 	
 	# Rotation de la caméra
@@ -491,8 +492,19 @@ func _handle_raycast_hit(result: Dictionary) -> void:
 	# Clic sur une unité
 	if collider.has_meta("unit"):
 		var unit = collider.get_meta("unit")
+		
+		# ✅ NOUVEAU : Mettre à jour l'unité survolée
+		if hovered_unit != unit:
+			hovered_unit = unit
+			_update_info_panel()
+		
 		_handle_unit_click(unit)
 		return
+	
+	# ✅ NOUVEAU : Plus d'unité survolée
+	if hovered_unit != null:
+		hovered_unit = null
+		_update_info_panel()
 	
 	# Clic sur le terrain
 	if collider is StaticBody3D:
@@ -526,6 +538,90 @@ func _handle_terrain_click(grid_pos: Vector2i) -> void:
 		selected_unit.movement_used = true
 		_close_all_menus()
 		_deselect_unit()
+
+# ============================================================================
+# PANEL D'INFORMATION (BAS DROITE)
+# ============================================================================
+
+func _update_info_panel() -> void:
+	"""Met à jour le panel d'information en bas à droite"""
+	
+	# Priorité 1 : Unité survolée
+	if hovered_unit and hovered_unit != selected_unit:
+		_display_unit_info(hovered_unit)
+		return
+	
+	# Priorité 2 : Unité sélectionnée
+	if selected_unit:
+		_display_unit_info(selected_unit)
+		return
+	
+	# Priorité 3 : Info de terrain
+	_display_terrain_info()
+
+func _display_unit_info(unit: BattleUnit3D) -> void:
+	"""Affiche les infos d'une unité dans le panel"""
+	info_unit_name_label.text = unit.unit_name
+	info_class_label.text = "Classe: " + unit.get_meta("class", "Guerrier")  # TODO: Ajouter classe
+	
+	info_hp_value.text = "%d/%d" % [unit.current_hp, unit.max_hp]
+	info_atk_value.text = str(unit.attack_power)
+	info_def_value.text = str(unit.defense_power)
+	info_mov_value.text = str(unit.movement_range)
+	
+	# Couleur selon HP
+	var hp_percent = unit.get_hp_percentage()
+	if hp_percent > 0.6:
+		info_hp_value.add_theme_color_override("font_color", Color.GREEN)
+	elif hp_percent > 0.3:
+		info_hp_value.add_theme_color_override("font_color", Color.YELLOW)
+	else:
+		info_hp_value.add_theme_color_override("font_color", Color.RED)
+
+func _display_terrain_info() -> void:
+	"""Affiche les infos de terrain quand aucune unité n'est sélectionnée"""
+	
+	# Trouver la tuile sous la souris (ou tuile par défaut)
+	var grid_pos = _get_mouse_grid_position()
+	
+	if not terrain.is_in_bounds(grid_pos):
+		grid_pos = Vector2i(0, 0)  # Première tuile par défaut
+	
+	var tile_type = terrain.get_tile_type(grid_pos)
+	var tile_name = TerrainModule3D.TileType.keys()[tile_type]
+	
+	info_unit_name_label.text = "[Terrain]"
+	info_class_label.text = "Type: " + tile_name
+	
+	var move_cost = terrain.get_movement_cost(grid_pos)
+	var defense_bonus = terrain.get_defense_bonus(grid_pos)
+	
+	info_hp_value.text = "Coût: " + ("∞" if move_cost == INF else str(move_cost))
+	info_atk_value.text = "--"
+	info_def_value.text = "+" + str(defense_bonus)
+	info_mov_value.text = "--"
+	
+	info_hp_value.add_theme_color_override("font_color", Color.WHITE)
+
+func _get_mouse_grid_position() -> Vector2i:
+	"""Retourne la position de grille sous la souris"""
+	var mouse_pos = get_viewport().get_mouse_position()
+	var from = camera.project_ray_origin(mouse_pos)
+	var to = from + camera.project_ray_normal(mouse_pos) * mouse_ray_length
+	
+	var space_state = get_world_3d().direct_space_state
+	var query = PhysicsRayQueryParameters3D.create(from, to)
+	query.collide_with_areas = false
+	query.collision_mask = 1  # Terrain uniquement
+	
+	var result = space_state.intersect_ray(query)
+	
+	if result and result.collider is StaticBody3D:
+		var mesh_parent = result.collider.get_parent()
+		if mesh_parent.has_meta("grid_position"):
+			return mesh_parent.get_meta("grid_position")
+	
+	return Vector2i(-1, -1)
 
 # ============================================================================
 # SÉLECTION D'UNITÉ & MENU D'ACTIONS
