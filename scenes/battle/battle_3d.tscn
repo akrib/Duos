@@ -139,6 +139,12 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 18
 text = "Menu"
 
+[node name="UndoButton" type="Button" parent="UILayer/BattleUI/BottomBar/MarginContainer/HBoxContainer/ButtonsContainer"]
+custom_minimum_size = Vector2(150, 60)
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "↩️ Annuler"
+
 [node name="ActionPopup" type="PopupPanel" parent="UILayer/BattleUI"]
 
 [node name="VBoxContainer" type="VBoxContainer" parent="UILayer/BattleUI/ActionPopup"]

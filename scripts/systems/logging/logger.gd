@@ -21,6 +21,10 @@ var log_file: FileAccess = null
 var session_start_time: float = 0.0
 
 func _ready() -> void:
+	enable_category("BATTLE")
+	enable_category("DIALOGUE")
+	enable_category("WORLD_MAP")
+	enable_category("DATA")
 	session_start_time = Time.get_unix_time_from_system()
 	
 	if log_to_file:
@@ -48,7 +52,7 @@ func _rotate_log_file() -> void:
 	var backup_path = LOG_FILE_PATH.replace(".log", "_%s.log" % Time.get_datetime_string_from_system())
 	DirAccess.rename_absolute(LOG_FILE_PATH, backup_path)
 
-func log(level: LogLevel, category: String, message: String) -> void:
+func _log_internal(level: LogLevel, category: String, message: String) -> void:
 	if level < current_log_level:
 		return
 	
@@ -75,19 +79,19 @@ func log(level: LogLevel, category: String, message: String) -> void:
 		log_file.flush()
 
 func debug(category: String, message: String) -> void:
-	log(LogLevel.DEBUG, category, message)
+	_log_internal(LogLevel.DEBUG, category, message)
 
 func info(category: String, message: String) -> void:
-	log(LogLevel.INFO, category, message)
+	_log_internal(LogLevel.INFO, category, message)
 
 func warning(category: String, message: String) -> void:
-	log(LogLevel.WARNING, category, message)
+	_log_internal(LogLevel.WARNING, category, message)
 
 func error(category: String, message: String) -> void:
-	log(LogLevel.ERROR, category, message)
+	_log_internal(LogLevel.ERROR, category, message)
 
 func critical(category: String, message: String) -> void:
-	log(LogLevel.CRITICAL, category, message)
+	_log_internal(LogLevel.CRITICAL, category, message)
 
 func set_log_level(level: LogLevel) -> void:
 	current_log_level = level

@@ -47,14 +47,6 @@ func set_battle_data(data: Dictionary) -> bool:
 		battle_data_invalid.emit(result.errors)
 		return false
 	
-	# Validation
-	var validation_result = _validate_battle_data(data)
-	
-	if not validation_result.valid:
-		push_error("[BattleDataManager] ❌ Données invalides : ", validation_result.errors)
-		battle_data_invalid.emit(validation_result.errors)
-		return false
-	
 	# Stockage
 	_current_battle_data = data.duplicate(true)
 	_is_data_valid = true
@@ -116,95 +108,6 @@ func force_clear() -> void:
 	push_warning("[BattleDataManager] ⚠️ Nettoyage forcé des données")
 	clear_battle_data()
 
-# ============================================================================
-# VALIDATION
-# ============================================================================
-
-## Valide la structure des données de combat
-func _validate_battle_data(data: Dictionary) -> Dictionary:
-	"""
-	Valide que les données de combat ont la structure attendue
-	
-	@param data : Données à valider
-	@return Dictionary avec {valid: bool, errors: Array}
-	"""
-	
-	var errors: Array = []
-	
-	# Vérifier les champs obligatoires
-	var required_fields = ["player_units", "enemy_units"]
-	
-	for field in required_fields:
-		if not data.has(field):
-			errors.append("Champ manquant : " + field)
-	
-	# Vérifier que les unités ne sont pas vides
-	if data.has("player_units") and data.player_units is Array:
-		if data.player_units.is_empty():
-			errors.append("player_units est vide")
-	else:
-		errors.append("player_units n'est pas un Array")
-	
-	if data.has("enemy_units") and data.enemy_units is Array:
-		if data.enemy_units.is_empty():
-			errors.append("enemy_units est vide")
-	else:
-		errors.append("enemy_units n'est pas un Array")
-	
-	# Valider chaque unité joueur
-	if data.has("player_units"):
-		for i in range(data.player_units.size()):
-			var unit = data.player_units[i]
-			var unit_errors = _validate_unit_data(unit, "player_units[" + str(i) + "]")
-			errors.append_array(unit_errors)
-	
-	# Valider chaque unité ennemie
-	if data.has("enemy_units"):
-		for i in range(data.enemy_units.size()):
-			var unit = data.enemy_units[i]
-			var unit_errors = _validate_unit_data(unit, "enemy_units[" + str(i) + "]")
-			errors.append_array(unit_errors)
-	
-	return {
-		"valid": errors.is_empty(),
-		"errors": errors
-	}
-
-## Valide les données d'une unité
-func _validate_unit_data(unit: Dictionary, context: String) -> Array:
-	"""
-	Valide qu'une unité a les champs nécessaires
-	
-	@param unit : Données de l'unité
-	@param context : Contexte pour les erreurs (ex: "player_units[0]")
-	@return Array d'erreurs
-	"""
-	
-	var errors: Array = []
-	
-	# Champs obligatoires pour une unité
-	var required_fields = ["name", "position", "stats"]
-	
-	for field in required_fields:
-		if not unit.has(field):
-			errors.append(context + " : champ manquant '" + field + "'")
-	
-	# Valider la position
-	if unit.has("position"):
-		var pos = unit.position
-		if not (pos is Vector2i):
-			errors.append(context + " : position n'est pas un Vector2i")
-	
-	# Valider les stats
-	if unit.has("stats"):
-		var stats = unit.stats
-		var required_stats = ["hp", "attack", "defense", "movement"]
-		
-		for stat in required_stats:
-			if not stats.has(stat):
-				errors.append(context + " : stat manquante '" + stat + "'")
-	
-	return errors
 
 # ============================================================================
 # DEBUG

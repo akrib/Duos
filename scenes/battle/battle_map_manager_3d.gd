@@ -71,7 +71,7 @@ enum ActionState {
 
 # Boutons de contrôle
 @onready var end_turn_button: Button = $UILayer/BattleUI/BottomBar/MarginContainer/HBoxContainer/ButtonsContainer/EndTurnButton
-
+@onready var undo_button: Button = $UILayer/BattleUI/BottomBar/MarginContainer/HBoxContainer/ButtonsContainer/UndoButton
 # dialogue
 @onready var dialogue_box: DialogueBox = $UILayer/DialogueBox
 
@@ -117,7 +117,7 @@ const ATTACK_COLOR: Color = Color(1.0, 0.3, 0.3, 0.5)
 # ============================================================================
 
 var battle_data: Dictionary = {}
-var current_phase: TurnPhase = TurnPhase.PLAYER_TURN
+#var current_phase: TurnPhase = TurnPhase.PLAYER_TURN
 var current_turn: int = 1
 var selected_unit: BattleUnit3D = null
 var duo_partner: BattleUnit3D = null
@@ -141,7 +141,7 @@ var mouse_ray_length: float = 1000.0
 
 
 func _ready() -> void:
-	
+	undo_button.pressed.connect(_on_undo_pressed)
 	battle_state_machine = BattleStateMachine.new()
 	battle_state_machine.debug_mode = true
 	add_child(battle_state_machine)
@@ -163,6 +163,12 @@ func _ready() -> void:
 		call_deferred("initialize_battle", battle_data)
 	else:
 		push_error("[BattleMapManager3D] ❌ Aucune donnée de combat disponible")
+	battle_state_machine.state_changed.connect(_on_battle_state_changed)
+	if DebugOverlay:
+		DebugOverlay.watch_variable("Tour actuel", self, "current_turn")
+		DebugOverlay.watch_variable("Phase", self, "current_phase")
+		DebugOverlay.watch_variable("Unités joueur", unit_manager, "player_units")
+		DebugOverlay.watch_variable("Unités ennemies", unit_manager, "enemy_units")
 
 #func move_unit_with_command(unit: BattleUnit3D, target_pos: Vector2i) -> void:
 	#var command = MoveUnitCommand.new(unit, target_pos, unit_manager)
@@ -345,10 +351,8 @@ func _start_battle() -> void:
 # ============================================================================
 
 func change_phase(new_phase: TurnPhase) -> void:
-	current_phase = new_phase
-	turn_phase_changed.emit(new_phase)
-	phase_label.text = "Phase: " + TurnPhase.keys()[new_phase]
-	print("[BattleMapManager3D] Phase: ", TurnPhase.keys()[new_phase])
+	var state_name = TurnPhase.keys()[new_phase]
+	battle_state_machine.change_state(state_name)
 
 func _start_player_turn() -> void:
 	print("[BattleMapManager3D] === Tour ", current_turn, " - JOUEUR ===")
@@ -448,7 +452,7 @@ func rotate_camera(degrees: float) -> void:
 	is_camera_rotating = true
 
 func _input(event: InputEvent) -> void:
-	if not is_battle_active or current_phase != TurnPhase.PLAYER_TURN:
+	if not is_battle_active or  battle_state_machine.current_state_name != TurnPhase.PLAYER_TURN:
 		return
 	
 	# Rotation de la caméra
@@ -516,7 +520,9 @@ func _handle_terrain_click(grid_pos: Vector2i) -> void:
 		return
 	
 	if movement_module.can_move_to(selected_unit, grid_pos):
-		await movement_module.move_unit(selected_unit, grid_pos)
+		#await movement_module.move_unit(selected_unit, grid_pos)
+		var cmd = MoveUnitCommand.new(selected_unit, grid_pos, unit_manager)
+		command_history.execute_command(cmd)
 		selected_unit.movement_used = true
 		_close_all_menus()
 		_deselect_unit()
@@ -836,3 +842,12 @@ func _calculate_rewards(victory: bool, stats: Dictionary) -> Dictionary:
 func _exit_tree() -> void:
 	EventBus.disconnect_all(self)
 	print("[BattleMapManager3D] Nettoyé")
+	
+func _on_battle_state_changed(from: String, to: String) -> void:
+	print("[BattleMapManager] État : ", from, " → ", to)
+	phase_label.text = "Phase: " + to
+
+
+func _on_undo_pressed() -> void:
+	if command_history.can_undo():
+		command_history.undo()

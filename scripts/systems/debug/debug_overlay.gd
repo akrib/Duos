@@ -75,7 +75,17 @@ func _update_display() -> void:
 	# EventBus connections
 	text += "[b]EventBus:[/b]\n"
 	text += "  Signaux actifs: TODO\n"
-	
+		
+	if GameManager.current_scene_id == SceneRegistry.SceneID.BATTLE:
+		text += "[b]Combat:[/b]\n"
+		text += "  État: %s\n" % watched_variables.get("Phase", "N/A")
+		text += "  Tour: %s\n" % watched_variables.get("Tour actuel", "N/A")
+		
+		var player_units = watched_variables.get("Unités joueur", [])
+		var enemy_units = watched_variables.get("Unités ennemies", [])
+		text += "  Joueur: %d unités\n" % player_units.size()
+		text += "  Ennemis: %d unités\n\n" % enemy_units.size()
+
 	info_label.text = text
 
 func watch_variable(key: String, object: Node, property: String) -> void:
