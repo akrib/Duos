@@ -229,27 +229,26 @@ func _calculate_unit_score(stats: Dictionary) -> float:
 # MVP
 # ============================================================================
 
-func get_mvp() -> BattleUnit3D:
-	"""Détermine le MVP du combat"""
+func get_mvp() -> Dictionary:
+	"""Retourne les stats du MVP (data only)"""
 	
-	var best_unit: BattleUnit3D = null
+	var best_stats: Dictionary = {}
 	var best_score: float = -INF
 	
 	for unit_id in unit_stats:
 		var stats = unit_stats[unit_id]
-		var unit = stats.unit
 		
-		# Seulement les unités joueur
-		if not unit.is_player_unit:
+		if not stats.is_player:
 			continue
 		
 		var score = _calculate_unit_score(stats)
 		
 		if score > best_score:
 			best_score = score
-			best_unit = unit
+			best_stats = stats
 	
-	return best_unit
+	return best_stats
+
 
 # ============================================================================
 # DEBUG
