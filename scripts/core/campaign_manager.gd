@@ -22,7 +22,6 @@ func _ready() -> void:
 	EventBus.safe_connect("battle_ended", _on_battle_ended)
 	print("[CampaignManager] ✅ Initialisé (mode JSON)")
 
-## Démarrer un combat en chargeant ses données depuis JSON
 func start_battle(battle_id: String) -> void:
 	print("[CampaignManager] 🎯 Chargement du combat : ", battle_id)
 	
@@ -32,6 +31,9 @@ func start_battle(battle_id: String) -> void:
 	if battle_data.is_empty():
 		push_error("[CampaignManager] Impossible de charger : ", battle_id)
 		return
+	
+	# ✅ NOUVEAU : Merger avec la team du joueur
+	battle_data = _merge_player_team(battle_data)
 	
 	# Ajouter un ID unique
 	battle_data["battle_id"] = battle_id + "_" + str(Time.get_unix_time_from_system())
@@ -44,7 +46,7 @@ func start_battle(battle_id: String) -> void:
 		EventBus.change_scene(SceneRegistry.SceneID.BATTLE)
 	else:
 		push_error("[CampaignManager] ❌ Échec du stockage des données")
-
+		
 ## Charge un fichier JSON de données de combat
 func load_battle_data_from_json(battle_id: String) -> Dictionary:
 	if not BATTLE_DATA_PATHS.has(battle_id):
@@ -64,6 +66,52 @@ func load_battle_data_from_json(battle_id: String) -> Dictionary:
 	
 	print("[CampaignManager] ✅ Battle data chargée : ", battle_id)
 	return battle_data
+
+func _merge_player_team(battle_data: Dictionary) -> Dictionary:
+	"""Fusionne l'équipe du joueur avec les alliés du scénario"""
+	
+	var result = battle_data.duplicate(true)
+	var team = TeamManager.get_current_team()
+	
+	# Convertir la team en format de combat
+	var team_units: Array = []
+	
+	for i in range(team.size()):
+		var unit = team[i]
+		var battle_unit = _convert_team_unit_to_battle(unit, i)
+		team_units.append(battle_unit)
+	
+	# Merge avec les alliés du scénario
+	if result.has("player_units"):
+		# Décaler les positions des alliés du scénario
+		for ally in result.player_units:
+			if ally.has("position"):
+				ally.position.x += 2  # Décalage
+	else:
+		result["player_units"] = []
+	
+	# Ajouter la team au début
+	for unit in team_units:
+		result.player_units.insert(0, unit)
+	
+	print("[CampaignManager] ✅ Team mergée : ", team_units.size(), " + ", result.player_units.size() - team_units.size(), " alliés")
+	
+	return result
+
+func _convert_team_unit_to_battle(unit: Dictionary, index: int) -> Dictionary:
+	"""Convertit une unité du roster en format de combat"""
+	
+	return {
+		"id": unit.get("instance_id", unit.get("id")),
+		"name": unit.get("name"),
+		"position": Vector2i(2, 6 + index),  # Positions de départ
+		"stats": unit.get("stats", {}).duplicate(),
+		"abilities": unit.get("abilities", []).duplicate(),
+		"color": unit.get("color", {"r": 0.5, "g": 0.5, "b": 0.8, "a": 1.0}),
+		"level": unit.get("level", 1),
+		"xp": unit.get("xp", 0),
+		"current_hp": unit.get("current_hp", unit.get("stats", {}).get("hp", 100))
+	}
 
 ## Convertit les positions JSON en Vector2i
 func _convert_json_positions(data: Dictionary) -> Dictionary:

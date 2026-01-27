@@ -14,7 +14,6 @@ var peak_height: float = 2.0
 var horizontal_offset: Vector3 = Vector3(0, 0, 0)
 
 func _ready() -> void:
-	# Créer le label 3D
 	label_3d = Label3D.new()
 	label_3d.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	label_3d.no_depth_test = true
@@ -22,13 +21,14 @@ func _ready() -> void:
 	label_3d.outline_size = 4
 	label_3d.outline_modulate = Color.BLACK
 	add_child(label_3d)
-	
-	# Style
+
 	label_3d.font_size = 48
 	label_3d.modulate = Color.YELLOW
 	label_3d.text = str(damage_value)
-	
-	start_position = global_position
+
+	# ✅ Maintenant le node est dans l’arbre
+	global_position = start_position
+
 
 func _process(delta: float) -> void:
 	elapsed += delta
@@ -57,6 +57,6 @@ func _process(delta: float) -> void:
 func setup(damage: int, spawn_pos: Vector3, offset: Vector3 = Vector3.ZERO) -> void:
 	"""Configure le nombre de dégâts"""
 	damage_value = damage
-	global_position = spawn_pos
+	#global_position = spawn_pos
 	start_position = spawn_pos
 	horizontal_offset = offset

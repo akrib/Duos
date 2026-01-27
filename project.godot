@@ -25,6 +25,7 @@ BattleDataManager="*res://scripts/core/battle_data_manager.gd"
 GlobalLogger="*res://scripts/systems/logging/logger.gd"
 DebugOverlay="*res://scripts/systems/debug/debug_overlay.gd"
 Version_Manager="*res://scripts/systems/versioning/version_manager.gd"
+TeamManager="*res://scripts/core/team_manager.gd"
 
 [display]
 

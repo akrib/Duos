@@ -56,21 +56,6 @@
   ],
   "enemy_units": [
     {
-      "id": "goblin_1",
-      "name": "Gobelin Lancier",
-      "unit_type": "goblin",
-      "current_hp": 50,
-      "max_hp": 50,
-      "position": [8, 3],
-      "stats": {
-        "attack": 8,
-        "defense": 5,
-        "speed": 4,
-        "range": 1
-      },
-      "abilities": ["stab"]
-    },
-    {
       "id": "goblin_2",
       "name": "Gobelin Archer",
       "unit_type": "goblin_archer",
@@ -79,7 +64,7 @@
       "position": [9, 5],
       "stats": {
         "attack": 10,
-        "defense": 3,
+        "defense": 0,
         "speed": 5,
         "range": 3
       },
@@ -94,7 +79,7 @@
       "position": [10, 4],
       "stats": {
         "attack": 12,
-        "defense": 6,
+        "defense": 0,
         "speed": 7,
         "range": 1
       },
@@ -109,26 +94,11 @@
       "position": [11, 4],
       "stats": {
         "attack": 15,
-        "defense": 4,
+        "defense": 0,
         "speed": 3,
         "range": 2
       },
       "abilities": ["dark_bolt", "curse"]
-    },
-    {
-      "id": "wolf_2",
-      "name": "Loup Alpha",
-      "unit_type": "wolf",
-      "current_hp": 70,
-      "max_hp": 70,
-      "position": [9, 2],
-      "stats": {
-        "attack": 14,
-        "defense": 8,
-        "speed": 8,
-        "range": 1
-      },
-      "abilities": ["bite", "pack_leader"]
     }
   ],
   "terrain_obstacles": [

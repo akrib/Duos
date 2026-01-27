@@ -339,8 +339,19 @@ func _start_player_turn() -> void:
 	print("[BattleMapManager3D] === Tour ", current_turn, " - JOUEUR ===")
 	turn_label.text = "Tour " + str(current_turn)
 	unit_manager.reset_player_units()
+	
+	# ✅ NOUVEAU : Mettre à jour les torus
+	_update_all_torus_states(true)
+	
 	json_scenario_module.trigger_turn_event(current_turn, false)
 	set_process_input(true)
+
+func _update_all_torus_states(is_player_turn: bool) -> void:
+	var all_units = unit_manager.get_all_units()
+	
+	for unit in all_units:
+		var is_current_turn = (is_player_turn and unit.is_player_unit) or (not is_player_turn and not unit.is_player_unit)
+		unit.update_torus_state(is_current_turn)
 
 func _end_player_turn() -> void:
 	print("[BattleMapManager3D] Fin du tour joueur")
@@ -355,6 +366,10 @@ func _end_player_turn() -> void:
 func _start_enemy_turn() -> void:
 	print("[BattleMapManager3D] === Tour ", current_turn, " - ENNEMI ===")
 	unit_manager.reset_enemy_units()
+	
+	# ✅ NOUVEAU : Mettre à jour les torus
+	_update_all_torus_states(false)
+	
 	json_scenario_module.trigger_turn_event(current_turn, false)
 	await ai_module.execute_enemy_turn()
 	_end_enemy_turn()
@@ -734,38 +749,43 @@ func _open_duo_selection_menu() -> void:
 	if not selected_unit:
 		return
 	
+	# ✅ NOUVEAU : Vérifier si attaque solo est possible
+	var allies = unit_manager.get_alive_player_units()
+	var can_duo = allies.size() > 1  # Au moins 2 alliés vivants
+	
 	# Nettoyer le container des boutons précédents
 	for child in duo_units_container.get_children():
 		child.queue_free()
 	
-	# Créer un bouton pour chaque unité alliée à portée
-	var allies = unit_manager.get_alive_player_units()
-	var duo_candidates: Array[BattleUnit3D] = []
-	
-	for ally in allies:
-		if ally == selected_unit:
-			continue
+	if can_duo:
+		# Créer boutons pour chaque allié
+		var duo_candidates: Array[BattleUnit3D] = []
 		
-		# Vérifier la distance (duo possible si adjacent ou à portée)
-		var distance = terrain_module.get_distance(selected_unit.grid_position, ally.grid_position)
-		if distance <= 3:  # Portée de duo configurable
-			duo_candidates.append(ally)
+		for ally in allies:
+			if ally == selected_unit:
+				continue
+			
+			var distance = terrain_module.get_distance(selected_unit.grid_position, ally.grid_position)
+			if distance <= 3:
+				duo_candidates.append(ally)
+		
+		for candidate in duo_candidates:
+			var button = Button.new()
+			button.text = "👥 " + candidate.unit_name
+			button.custom_minimum_size = Vector2(180, 40)
+			button.pressed.connect(func(): _select_duo_partner(candidate))
+			duo_units_container.add_child(button)
 	
-	# Créer les boutons
-	for candidate in duo_candidates:
-		var button = Button.new()
-		button.text = "👥 " + candidate.unit_name
-		button.custom_minimum_size = Vector2(180, 40)
-		button.pressed.connect(func(): _select_duo_partner(candidate))
-		duo_units_container.add_child(button)
+	# ✅ Bouton solo (toujours disponible)
+	solo_button.visible = true
+	solo_button.text = "🚶 Attaquer Seul" if can_duo else "⚔️ Attaquer"
 	
-	# Positionner et afficher le popup
+	# Positionner et afficher
 	var screen_pos = camera.unproject_position(selected_unit.position)
 	duo_popup.position = screen_pos + Vector2(50, -200)
 	duo_popup.popup()
 	
 	current_action_state = ActionState.CHOOSING_DUO
-	print("[BattleMapManager3D] Sélection de duo ouverte")
 
 func _select_duo_partner(partner: BattleUnit3D) -> void:
 	if partner == selected_unit:
@@ -865,6 +885,8 @@ func _check_battle_end() -> void:
 
 func _end_battle(victory: bool) -> void:
 	is_battle_active = false
+	if victory:
+		_award_xp_to_survivors()
 	
 	if json_scenario_module.has_outro():
 		change_phase(TurnPhase.CUTSCENE)
@@ -883,6 +905,13 @@ func _end_battle(victory: bool) -> void:
 	EventBus.battle_ended.emit(results)
 	await get_tree().create_timer(2.0).timeout
 	EventBus.change_scene(SceneRegistry.SceneID.BATTLE_RESULTS)
+
+func _award_xp_to_survivors() -> void:
+	var player_units = unit_manager.get_alive_player_units()
+	var xp_per_unit = 50 + (current_turn * 10)  # Formule simple
+	
+	for unit in player_units:
+		unit.award_xp(xp_per_unit)
 
 func _calculate_rewards(victory: bool, stats: Dictionary) -> Dictionary:
 	if not victory:

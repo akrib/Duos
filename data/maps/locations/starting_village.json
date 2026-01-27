@@ -35,6 +35,12 @@
       "icon": "res://assets/icons/actions/inn.png",
       "scene": "res://scenes/world/buildings/inn.tscn",
       "unlocked_at_step": 0
+    },
+      {
+      "id": "manage_team",
+      "type": "team_management",
+      "label": "👥 Gérer l'Équipe",
+      "unlocked_at_step": 0
     }
   ],
   "npcs": [

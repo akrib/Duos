@@ -47,10 +47,12 @@ func _ready() -> void:
 # ============================================================================
 
 func register_unit(unit: BattleUnit3D) -> void:
-	"""Enregistre une nouvelle unité pour le tracking"""
-	
 	unit_stats[unit.unit_id] = {
-		"unit": unit,
+		# ❌ plus de référence au node
+		"id": unit.unit_id,
+		"name": unit.unit_name,
+		"is_player": unit.is_player_unit,
+
 		"damage_dealt": 0,
 		"damage_taken": 0,
 		"healing_done": 0,
@@ -60,11 +62,9 @@ func register_unit(unit: BattleUnit3D) -> void:
 		"movements": 0,
 		"actions": 0,
 		"abilities_used": 0,
-		"turns_survived": 0
+		"turns_survived": 0,
+		"was_alive": true
 	}
-	
-	print("[StatsTracker] Unité enregistrée: ", unit.unit_name)
-
 # ============================================================================
 # ENREGISTREMENT DES ACTIONS
 # ============================================================================
@@ -132,26 +132,21 @@ func record_kill(killer: BattleUnit3D, victim: BattleUnit3D) -> void:
 	stat_recorded.emit("kill", killer.unit_id)
 
 func record_death(unit: BattleUnit3D) -> void:
-	"""Enregistre la mort d'une unité"""
-	
 	if unit_stats.has(unit.unit_id):
 		unit_stats[unit.unit_id].deaths += 1
-	
+		unit_stats[unit.unit_id].was_alive = false
+
 	if unit.is_player_unit:
 		global_stats.units_lost += 1
-	
+
 	stat_recorded.emit("death", unit.unit_id)
 
 func record_turn_end() -> void:
-	"""Enregistre la fin d'un tour"""
-	
 	global_stats.turns_elapsed += 1
-	
-	# Incrémenter les tours survivés pour chaque unité vivante
+
 	for unit_id in unit_stats:
-		var unit = unit_stats[unit_id].unit
-		if unit.is_alive():
-			unit_stats[unit_id].turns_survived += 1
+		if unit_stats[unit_id].was_alive:
+			unit_stats[unit_id].turns_survived += 11
 
 # ============================================================================
 # CALCULS
@@ -195,19 +190,16 @@ func calculate_efficiency() -> float:
 	return max(0.0, score)
 
 func get_unit_summaries() -> Array[Dictionary]:
-	"""Retourne un résumé des stats par unité"""
-	
 	var summaries: Array[Dictionary] = []
-	
+
 	for unit_id in unit_stats:
 		var stats = unit_stats[unit_id]
-		var unit = stats.unit
-		
+
 		summaries.append({
-			"id": unit_id,
-			"name": unit.unit_name,
-			"is_player": unit.is_player_unit,
-			"is_alive": unit.is_alive(),
+			"id": stats.id,
+			"name": stats.name,
+			"is_player": stats.is_player,
+			"is_alive": stats.was_alive,
 			"damage_dealt": stats.damage_dealt,
 			"damage_taken": stats.damage_taken,
 			"kills": stats.kills,
@@ -215,7 +207,8 @@ func get_unit_summaries() -> Array[Dictionary]:
 			"actions": stats.actions,
 			"score": _calculate_unit_score(stats)
 		})
-	
+
+	return summaries
 	return summaries
 
 func _calculate_unit_score(stats: Dictionary) -> float:
@@ -281,3 +274,6 @@ func print_stats() -> void:
 		print("\nMVP: ", mvp.unit_name)
 	
 	print("==============================\n")
+	
+	
+	

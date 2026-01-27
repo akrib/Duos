@@ -37,7 +37,8 @@ const AUTOLOAD_NAMES: Array[String] = [
 	"BattleDataManager",
 	"GlobalLogger",
 	"DebugOverlay",
-	"Version_Manager"
+	"Version_Manager",
+	"TeamManager"
 	
 ]
 

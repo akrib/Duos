@@ -4,6 +4,15 @@ extends Node3D
 
 class_name BattleUnit3D
 
+enum TorusState {
+	CAN_ACT_AND_MOVE,   # Vert
+	CAN_ACT_ONLY,        # Jaune
+	CAN_MOVE_ONLY,       # Bleu
+	CANNOT_ACT,          # Gris
+	SELECTED,            # Rouge
+	ENEMY_TURN           # Gris (pendant tour ennemi)
+}
+
 # ============================================================================
 # SIGNAUX (identiques à la version 2D)
 # ============================================================================
@@ -62,7 +71,7 @@ var status_effects: Dictionary = {}
 
 var unit_color: Color = Color.BLUE
 var is_selected: bool = false
-
+var current_torus_state: TorusState = TorusState.CAN_ACT_AND_MOVE
 # Visuels 3D
 var sprite_3d: Sprite3D
 var hp_bar_container: Node3D  # Container pour billboard
@@ -71,7 +80,8 @@ var hp_bar_bg: MeshInstance3D
 var team_indicator: MeshInstance3D  # ← Maintenant enfant de hp_bar_container
 var selection_indicator: MeshInstance3D
 var shadow_sprite: Sprite3D
-
+var level: int = 1
+var xp: int = 0
 # ============================================================================
 # INITIALISATION
 # ============================================================================
@@ -168,10 +178,8 @@ func _create_circle_texture(size: int, color: Color) -> ImageTexture:
 	return ImageTexture.create_from_image(image)
 
 func _create_selection_ring() -> MeshInstance3D:
-	"""Crée un anneau de sélection au sol - HORIZONTAL"""
 	var mesh_instance = MeshInstance3D.new()
 	
-	# Utiliser un TorusMesh pour l'anneau
 	var torus = TorusMesh.new()
 	torus.inner_radius = tile_size * 0.35
 	torus.outer_radius = tile_size * 0.45
@@ -179,28 +187,72 @@ func _create_selection_ring() -> MeshInstance3D:
 	torus.ring_segments = 48
 	
 	mesh_instance.mesh = torus
+	mesh_instance.rotation_degrees.y = -90
+	mesh_instance.position.y = -0.4
 	
-	# ✅ CORRECTION : Rotation pour mettre l'anneau horizontal au sol
-	# Le TorusMesh est vertical par défaut (axe Y), on le tourne de -90° sur X
-	#mesh_instance.rotation_degrees.x = -90  # Horizontal au sol
-	mesh_instance.rotation_degrees.y = -90  # Horizontal au sol
-	#mesh_instance.rotation_degrees.z = -90  # Horizontal au sol
-	mesh_instance.position.y = -0.4 # Légèrement au-dessus du sol
-	
-	# Matériau émissif jaune
 	var material = StandardMaterial3D.new()
-	material.albedo_color = Color.YELLOW
-	material.emission_enabled = true
-	material.emission = Color.YELLOW * 0.8
-	material.emission_energy_multiplier = 2.0
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	
-	# PAS D'OMBRES
-	mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	material.emission_enabled = true
+	material.emission_energy_multiplier = 2.0
 	
 	mesh_instance.set_surface_override_material(0, material)
+	mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	
+	# ✅ TOUJOURS VISIBLE
+	mesh_instance.visible = true
 	
 	return mesh_instance
+
+func update_torus_state(is_current_turn: bool) -> void:
+	if not selection_indicator:
+		return
+	
+	# Déterminer l'état
+	if is_selected:
+		current_torus_state = TorusState.SELECTED
+	elif not is_current_turn:
+		current_torus_state = TorusState.ENEMY_TURN
+	elif not can_move() and not can_act():
+		current_torus_state = TorusState.CANNOT_ACT
+	elif can_act() and not can_move():
+		current_torus_state = TorusState.CAN_ACT_ONLY
+	elif can_move() and not can_act():
+		current_torus_state = TorusState.CAN_MOVE_ONLY
+	else:
+		current_torus_state = TorusState.CAN_ACT_AND_MOVE
+	
+	# Appliquer la couleur
+	_apply_torus_color()
+
+func _apply_torus_color() -> void:
+	var material = selection_indicator.get_surface_override_material(0) as StandardMaterial3D
+	
+	if not material:
+		return
+	
+	var color: Color
+	
+	match current_torus_state:
+		TorusState.CAN_ACT_AND_MOVE:
+			color = Color.GREEN
+		TorusState.CAN_ACT_ONLY:
+			color = Color.YELLOW
+		TorusState.CAN_MOVE_ONLY:
+			color = Color.CYAN
+		TorusState.CANNOT_ACT, TorusState.ENEMY_TURN:
+			color = Color.GRAY
+		TorusState.SELECTED:
+			color = Color.RED
+	
+	material.albedo_color = color
+	material.emission = color * 0.8
+	
+func set_selected(selected: bool) -> void:
+	is_selected = selected
+	update_torus_state(true)  # Force update
+	selected_changed.emit(selected)
+
+
 
 func _create_hp_bar_with_team_indicator() -> void:
 	"""Crée une barre de HP avec team indicator comme enfant"""
@@ -369,7 +421,7 @@ func reset_for_new_turn() -> void:
 	action_used = false
 	has_acted_this_turn = false
 	_process_status_effects()
-	_update_visuals()
+	update_torus_state(true)
 
 func _process_status_effects() -> void:
 	var effects_to_remove: Array[String] = []
@@ -400,14 +452,6 @@ func remove_status_effect(effect_name: String) -> void:
 func has_status_effect(effect_name: String) -> bool:
 	return status_effects.has(effect_name)
 
-# ============================================================================
-# SÉLECTION
-# ============================================================================
-
-func set_selected(selected: bool) -> void:
-	is_selected = selected
-	selection_indicator.visible = selected
-	selected_changed.emit(selected)
 
 # ============================================================================
 # VISUELS & ANIMATIONS 3D
@@ -470,11 +514,20 @@ func _animate_heal() -> void:
 	tween.tween_property(sprite_3d, "modulate", Color(1, 1, 1), 0.1)
 
 func _animate_death() -> void:
-	"""Animation de mort"""
 	var tween = create_tween()
 	tween.set_parallel(true)
-	tween.tween_property(self, "modulate:a", 0.0, 0.5)
+	
+	if sprite_3d:
+		tween.tween_property(sprite_3d, "modulate:a", 0.0, 0.5)
+	
+	if hp_bar_container:
+		tween.tween_property(hp_bar_container, "scale", Vector3.ZERO, 0.5)
+	
+	if selection_indicator:
+		tween.tween_property(selection_indicator, "scale", Vector3.ZERO, 0.3)
+	
 	tween.tween_property(self, "scale", Vector3(0.5, 0.5, 0.5), 0.5)
+	
 	tween.set_parallel(false)
 	tween.tween_callback(queue_free)
 
@@ -593,6 +646,19 @@ func initialize_unit(data: Dictionary) -> void:
 		# Couleur par défaut selon l'équipe
 		unit_color = Color(0.2, 0.2, 0.8) if is_player_unit else Color(0.8, 0.2, 0.2)
 	
+	level = data.get("level", 1)
+	xp = data.get("xp", 0)
+	
 	# ✅ CORRECTION : Log de debug pour vérifier les HP
 	print("[BattleUnit3D] Unité initialisée: ", unit_name, " (", unit_id, ")")
 	print("  → HP: ", current_hp, "/", max_hp, " (", get_hp_percentage() * 100, "%)")
+
+
+func award_xp(amount: int) -> void:
+	if not is_player_unit:
+		return  # Seuls les joueurs gagnent XP
+	
+	xp += amount
+	print("[", unit_name, "] +", amount, " XP (Total: ", xp, ")")
+	# Notifier TeamManager
+	TeamManager.add_xp(unit_id, amount)

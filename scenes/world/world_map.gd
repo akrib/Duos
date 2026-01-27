@@ -474,6 +474,9 @@ func _on_action_selected(action: Dictionary) -> void:
 	_close_location_menu()
 	
 	match action.get("type"):
+		"team_management":  # ✅ NOUVEAU
+			_handle_team_management_action()
+			
 		"battle":  # ← NOUVEAU
 			_handle_battle_action(action)
 		
@@ -522,6 +525,10 @@ func _handle_shop_action(action: Dictionary) -> void:
 	show_notification("Magasin : " + shop_id + " (à implémenter)", 2.0)
 	
 	# TODO: Ouvrir l'interface de magasin
+
+func _handle_team_management_action() -> void:
+	var roster_ui = load("res://scenes/team/team_roster_ui.tscn").instantiate()
+	ui_layer.add_child(roster_ui)
 
 func _handle_quest_board_action(action: Dictionary) -> void:
 	"""Gère le panneau de quêtes"""
