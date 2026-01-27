@@ -34,7 +34,11 @@ const AUTOLOAD_NAMES: Array[String] = [
 	"EventBus",
 	"GameManager", 
 	"Dialogue_Manager",
-	"BattleDataManager"
+	"BattleDataManager",
+	"GlobalLogger",
+	"DebugOverlay",
+	"Version_Manager"
+	
 ]
 
 # ============================================================================

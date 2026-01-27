@@ -76,6 +76,11 @@ func _create_visuals() -> void:
 	
 	# Zone de collision pour le clic
 	area = Area2D.new()
+	
+	area.collision_layer = 2  # Layer 2 pour les locations
+	area.collision_mask = 0   # Ne détecte rien (juste pour être cliquée)
+	area.input_pickable = true  # ✅ CRITIQUE : Permettre l'input
+	
 	var collision = CollisionShape2D.new()
 	var shape = CircleShape2D.new()
 	shape.radius = 32

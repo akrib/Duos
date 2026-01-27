@@ -65,6 +65,26 @@ func _create_action_menu() -> void:
 	action_menu.name = "ActionMenu"
 	action_menu.visible = false
 	
+	# ✅ AJOUT : Configurer le popup
+	action_menu.popup_window = false  # Pas de fenêtre OS séparée
+	action_menu.transparent_bg = false
+	action_menu.borderless = false
+	
+	# ✅ AJOUT : StyleBox pour visibilité
+	var stylebox = StyleBoxFlat.new()
+	stylebox.bg_color = Color(0.1, 0.1, 0.15, 0.95)
+	stylebox.border_width_left = 2
+	stylebox.border_width_top = 2
+	stylebox.border_width_right = 2
+	stylebox.border_width_bottom = 2
+	stylebox.border_color = Color(0.9, 0.9, 0.9)
+	stylebox.corner_radius_top_left = 8
+	stylebox.corner_radius_top_right = 8
+	stylebox.corner_radius_bottom_left = 8
+	stylebox.corner_radius_bottom_right = 8
+	
+	action_menu.add_theme_stylebox_override("panel", stylebox)
+	
 	var margin = MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 10)
 	margin.add_theme_constant_override("margin_top", 10)
@@ -77,6 +97,8 @@ func _create_action_menu() -> void:
 	margin.add_child(action_menu_container)
 	
 	ui_layer.add_child(action_menu)
+	
+	print("[WorldMap] ✅ Menu d'actions créé")
 
 func _connect_ui_buttons() -> void:
 	"""Connecte les boutons UI existants"""
@@ -300,13 +322,20 @@ func _spawn_player() -> void:
 	# Placer à la location de départ
 	var start_location_id = player_config.get("start_location", "")
 	
+	print("[WorldMap] 🎮 Placement du joueur...")
+	print("[WorldMap]   start_location_id = ", start_location_id)
+	
 	if locations.has(start_location_id):
-		player.set_location(locations[start_location_id])
+		var start_loc = locations[start_location_id]
+		print("[WorldMap]   ✅ Location trouvée : ", start_loc.location_name)
+		player.set_location(start_loc)
+		print("[WorldMap]   player.current_location_id = ", player.current_location_id)
 	else:
 		push_warning("[WorldMap] Location de départ introuvable : ", start_location_id)
 		# Fallback : première location déverrouillée
 		for loc_id in locations:
 			if locations[loc_id].is_unlocked:
+				print("[WorldMap]   🔄 Fallback sur : ", loc_id)
 				player.set_location(locations[loc_id])
 				break
 	
@@ -321,9 +350,11 @@ func _on_location_clicked(location: WorldMapLocation) -> void:
 	"""Clic sur une location"""
 	
 	print("[WorldMap] 🖱️ Clic sur : ", location.location_name)
-	
+	print("[WorldMap]   player.current_location_id = ", player.current_location_id)
+	print("[WorldMap]   location.location_id = ", location.location_id)
 	# Si le joueur est déjà sur cette location
 	if player.current_location_id == location.location_id:
+		print("[WorldMap] ✅ Joueur sur place, ouverture menu...")
 		_open_location_menu(location)
 		return
 	
@@ -331,12 +362,15 @@ func _on_location_clicked(location: WorldMapLocation) -> void:
 	var current_loc = locations.get(player.current_location_id)
 	
 	if not current_loc:
+		print("[WorldMap] ❌ Location actuelle introuvable !")
 		return
 	
 	var location_connections = current_loc.get_connections()
+	print("[WorldMap]   Connexions depuis location actuelle : ", location_connections)
 	
 	if location.location_id in location_connections:
 		# Déplacer le joueur
+		print("[WorldMap] 🚶 Déplacement du joueur...")
 		player.move_to_location(location)
 	else:
 		show_notification("Impossible d'aller directement à " + location.location_name, 2.0)
@@ -367,16 +401,16 @@ func _on_location_unhovered(_location: WorldMapLocation) -> void:
 
 func _open_location_menu(location: WorldMapLocation) -> void:
 	"""Ouvre le menu d'actions pour une location"""
-	
+	print("[WorldMap] 📋 Ouverture menu pour : ", location.location_id)
 	selected_location = location
 	
 	# Charger les données détaillées de la location
 	var location_data = WorldMapDataLoader.load_location_data(location.location_id)
-	
+	print("[WorldMap]   Données chargées : ", not location_data.is_empty())
 	if location_data.is_empty():
 		show_notification("Aucune action disponible ici", 2.0)
 		return
-	
+	print("[WorldMap]   Actions disponibles : ", location_data.get("actions", []).size())
 	# Nettoyer le menu
 	for child in action_menu_container.get_children():
 		child.queue_free()
@@ -387,8 +421,10 @@ func _open_location_menu(location: WorldMapLocation) -> void:
 	for action in actions:
 		# Vérifier si l'action est déverrouillée
 		if action.has("unlocked_at_step") and action.unlocked_at_step > current_step:
+			print("[WorldMap]   Action verrouillée : ", action.get("label", "?"))
 			continue
 		
+		print("[WorldMap]   Action verrouillée : ", action.get("label", "?"))
 		var button = Button.new()
 		button.text = action.get("label", "Action")
 		button.custom_minimum_size = Vector2(200, 40)
@@ -412,8 +448,10 @@ func _open_location_menu(location: WorldMapLocation) -> void:
 	close_button.pressed.connect(_close_location_menu)
 	action_menu_container.add_child(close_button)
 	
+	print("[WorldMap] 📋 Menu prêt, affichage popup...")
 	# Positionner et afficher
 	action_menu.popup_centered()
+	print("[WorldMap] ✅ Popup affiché (visible = ", action_menu.visible, ")")
 
 func _close_location_menu() -> void:
 	"""Ferme le menu d'actions"""
