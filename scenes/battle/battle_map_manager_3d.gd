@@ -552,10 +552,19 @@ func _display_unit_info(unit: BattleUnit3D) -> void:
 func _display_terrain_info() -> void:
 	"""Affiche les infos de terrain quand aucune unité n'est sélectionnée"""
 	
+	# ✅ CORRECTION : Vérifier que le terrain est chargé
+	if not terrain_module:
+		info_unit_name_label.text = "[Chargement...]"
+		info_class_label.text = ""
+		info_hp_value.text = "--"
+		info_atk_value.text = "--"
+		info_def_value.text = "--"
+		info_mov_value.text = "--"
+		return
+	
 	# Trouver la tuile sous la souris (ou tuile par défaut)
 	var grid_pos = _get_mouse_grid_position()
 	
-	# ✅ CORRECTION : terrain → terrain_module
 	if not terrain_module.is_in_bounds(grid_pos):
 		grid_pos = Vector2i(0, 0)  # Première tuile par défaut
 	
@@ -577,6 +586,11 @@ func _display_terrain_info() -> void:
 
 func _get_mouse_grid_position() -> Vector2i:
 	"""Retourne la position de grille sous la souris"""
+	
+	# ✅ CORRECTION : Vérifier que terrain_module existe
+	if not terrain_module:
+		return Vector2i(-1, -1)
+	
 	var mouse_pos = get_viewport().get_mouse_position()
 	var from = camera.project_ray_origin(mouse_pos)
 	var to = from + camera.project_ray_normal(mouse_pos) * mouse_ray_length

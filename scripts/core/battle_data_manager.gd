@@ -160,3 +160,4 @@ func _on_battle_ended(_results: Dictionary) -> void:
 func _exit_tree() -> void:
 	"""Nettoyage à la fermeture"""
 	EventBus.disconnect_all(self)
+	

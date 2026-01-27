@@ -418,20 +418,29 @@ func _update_hp_bar() -> void:
 	if not hp_bar_3d or not hp_bar_3d.mesh:
 		return
 	
+	# ✅ CORRECTION : Vérifier que max_hp > 0 pour éviter division par zéro
+	if max_hp <= 0:
+		push_warning("[BattleUnit3D] max_hp invalide pour ", unit_name)
+		return
+	
 	var hp_percent = get_hp_percentage()
 	
-	# ✅ CORRECTION : Redimensionner correctement
+	# ✅ CORRECTION : S'assurer que tile_size est valide
+	var bar_max_width = tile_size * 0.8
+	if bar_max_width <= 0:
+		bar_max_width = 0.8  # Fallback
+	
+	# Redimensionner correctement
 	var box_mesh = hp_bar_3d.mesh as BoxMesh
 	if box_mesh:
-		var max_width = tile_size * 0.8
-		var current_width = max_width * hp_percent
+		var current_width = bar_max_width * hp_percent
 		box_mesh.size.x = current_width
 		
-		# ✅ CORRECTION : Ancrer à gauche
-		var offset = (max_width - current_width) / 2.0
+		# Ancrer à gauche
+		var offset = (bar_max_width - current_width) / 2.0
 		hp_bar_3d.position.x = -offset
 	
-	# ✅ Changer la couleur selon le % de HP
+	# Changer la couleur selon le % de HP
 	var material = hp_bar_3d.get_surface_override_material(0) as StandardMaterial3D
 	if material:
 		if hp_percent > 0.6:
@@ -440,7 +449,7 @@ func _update_hp_bar() -> void:
 			material.albedo_color = Color.YELLOW
 		else:
 			material.albedo_color = Color.RED
-			
+
 func _update_visuals() -> void:
 	"""Met à jour tous les visuels"""
 	if not can_do_anything():
@@ -494,7 +503,6 @@ func get_unit_data() -> Dictionary:
 # ============================================================================
 # INITIALISATION DEPUIS DONNÉES
 # ============================================================================
-
 func initialize_unit(data: Dictionary) -> void:
 	"""Initialise l'unité à partir d'un dictionnaire de données"""
 	
@@ -513,12 +521,15 @@ func initialize_unit(data: Dictionary) -> void:
 	if data.has("position"):
 		grid_position = data.position
 	
-	# Stats
+	# ✅ CORRECTION : Initialiser les stats dans le bon ordre
+	var temp_max_hp = 100  # Valeur par défaut
+	var temp_current_hp = -1  # Sentinelle pour savoir si explicitement défini
+	
+	# Stats depuis le bloc "stats"
 	if data.has("stats"):
 		var stats = data.stats
 		if stats.has("hp"):
-			max_hp = stats.hp
-			current_hp = max_hp
+			temp_max_hp = stats.hp
 		if stats.has("attack"):
 			attack_power = stats.attack
 		if stats.has("defense"):
@@ -528,11 +539,27 @@ func initialize_unit(data: Dictionary) -> void:
 		if stats.has("range"):
 			attack_range = stats.range
 	
-	# Stats directes (format alternatif)
-	if data.has("hp"):
-		current_hp = data.hp
+	# Stats directes (écrasent les stats du bloc si présentes)
 	if data.has("max_hp"):
-		max_hp = data.max_hp
+		temp_max_hp = data.max_hp
+	
+	if data.has("hp"):
+		temp_current_hp = data.hp
+	
+	# ✅ CORRECTION : Appliquer les HP de façon cohérente
+	max_hp = temp_max_hp
+	
+	if temp_current_hp >= 0:
+		# HP explicitement défini dans les données
+		current_hp = temp_current_hp
+	else:
+		# Pas de HP spécifié → commencer au maximum
+		current_hp = max_hp
+	
+	# Sécurité : s'assurer que current_hp ne dépasse jamais max_hp
+	current_hp = min(current_hp, max_hp)
+	
+	# Stats directes restantes
 	if data.has("attack"):
 		attack_power = data.attack
 	if data.has("defense"):
@@ -566,4 +593,6 @@ func initialize_unit(data: Dictionary) -> void:
 		# Couleur par défaut selon l'équipe
 		unit_color = Color(0.2, 0.2, 0.8) if is_player_unit else Color(0.8, 0.2, 0.2)
 	
+	# ✅ CORRECTION : Log de debug pour vérifier les HP
 	print("[BattleUnit3D] Unité initialisée: ", unit_name, " (", unit_id, ")")
+	print("  → HP: ", current_hp, "/", max_hp, " (", get_hp_percentage() * 100, "%)")
