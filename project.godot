@@ -18,14 +18,14 @@ config/icon="res://icon.svg"
 
 [autoload]
 
-EventBus="*res://scripts/core/event_bus.gd"
-GameManager="*res://scripts/core/game_manager.gd"
-Dialogue_Manager="*res://scripts/core/dialogue_manager.gd"
-BattleDataManager="*res://scripts/core/battle_data_manager.gd"
-GlobalLogger="*res://scripts/systems/logging/logger.gd"
+EventBus="*res://scripts/autoloads/event_bus.gd"
+GameManager="*res://scripts/autoloads/game_manager.gd"
+Dialogue_Manager="*res://scripts/managers/dialogue_manager.gd"
+BattleDataManager="*res://scripts/managers/battle_data_manager.gd"
+GlobalLogger="*res://scripts/systems/logging/GlobalLogger.gd"
 DebugOverlay="*res://scripts/systems/debug/debug_overlay.gd"
 Version_Manager="*res://scripts/systems/versioning/version_manager.gd"
-TeamManager="*res://scripts/core/team_manager.gd"
+TeamManager="*res://scripts/managers/team_manager.gd"
 
 [display]
 
