@@ -94,6 +94,10 @@ var json_scenario_module: JSONScenarioModule
 var battle_state_machine: BattleStateMachine
 var command_history: CommandHistory
 
+var duo_system: DuoSystem
+var ring_system: RingSystem
+var data_validation: DataValidationModule
+
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
@@ -264,6 +268,35 @@ func _initialize_modules() -> void:
 	_connect_modules()
 	await get_tree().process_frame
 	print("[BattleMapManager3D] Modules 3D initialisés")
+	
+	duo_system = DuoSystem.new()
+	duo_system.terrain_module  = terrain_module  # Injection de dépendance
+	add_child(duo_system)
+	
+	ring_system = RingSystem.new()
+	add_child(ring_system)
+	
+	data_validation = DataValidationModule.new()
+	add_child(data_validation)
+	
+	# Charger les données
+	ring_system.load_rings_from_json("res://data/ring/rings.json")
+	
+	# Valider les données
+	var validation_report = data_validation.validate_all_data()
+	
+	if not validation_report.is_valid:
+		push_error("[BattleMapManager3D] ❌ Validation des données échouée!")
+		# Afficher les erreurs dans l'UI
+		for error in validation_report.errors:
+			print("  ERROR: ", error)
+	
+	# Connecter signaux
+	_connect_duo_signals()
+	
+	print("[BattleMapManager3D] ✅ Modules Phase 1 initialisés")
+
+	
 
 func _connect_modules() -> void:
 	unit_manager.unit_died.connect(_on_unit_died)
@@ -697,14 +730,27 @@ func _on_move_pressed() -> void:
 	
 	print("[BattleMapManager3D] Mode déplacement activé")
 
+# scenes/battle/battle_map_manager_3d.gd
+# MODIFIER _on_attack_pressed() :
+
 func _on_attack_pressed() -> void:
 	if not selected_unit or not selected_unit.can_act():
 		return
 	
 	action_popup.hide()
 	
-	# Ouvrir le menu de sélection de duo
-	_open_duo_selection_menu()
+	# Vérifier si l'unité est déjà en duo
+	if duo_system.is_unit_in_duo(selected_unit):
+		var duo_data = duo_system.get_duo_for_unit(selected_unit)
+		duo_partner = duo_data.support if duo_data.leader == selected_unit else duo_data.leader
+		print("[Battle] ✅ Duo existant utilisé")
+		_show_attack_range()
+	else:
+		# Ouvrir le menu de sélection de duo
+		_open_duo_selection_menu()
+
+# MODIFIER _select_duo_partner() :
+
 
 func _on_defend_pressed() -> void:
 	if not selected_unit or not selected_unit.can_act():
@@ -791,13 +837,15 @@ func _select_duo_partner(partner: BattleUnit3D) -> void:
 	if partner == selected_unit:
 		return
 	
-	duo_partner = partner
-	duo_popup.hide()
-	
-	# Afficher la portée d'attaque
-	_show_attack_range()
-	
-	print("[BattleMapManager3D] Duo formé: ", selected_unit.unit_name, " + ", partner.unit_name)
+	# ✅ NOUVEAU : Utiliser DuoSystem
+	if duo_system.try_form_duo(selected_unit, partner):
+		duo_partner = partner
+		duo_popup.hide()
+		_show_attack_range()
+		
+		print("[Battle] ✅ Duo formé via DuoSystem")
+	else:
+		EventBus.notify("Impossible de former ce duo", "warning")
 
 func _on_solo_attack_pressed() -> void:
 	duo_partner = null
@@ -884,7 +932,9 @@ func _check_battle_end() -> void:
 			_on_victory()
 
 func _end_battle(victory: bool) -> void:
+	
 	is_battle_active = false
+	duo_system.clear_all_duos()
 	if victory:
 		_award_xp_to_survivors()
 	
@@ -941,3 +991,23 @@ func _on_battle_state_changed(from: String, to: String) -> void:
 func _on_undo_pressed() -> void:
 	if command_history.can_undo():
 		command_history.undo()
+		
+func _connect_duo_signals() -> void:
+	duo_system.duo_formed.connect(_on_duo_formed)
+	duo_system.duo_broken.connect(_on_duo_broken)
+	duo_system.duo_validation_failed.connect(_on_duo_validation_failed)
+	
+	
+	
+func _on_duo_formed(duo_data: Dictionary) -> void:
+	var leader = duo_data.leader as BattleUnit3D
+	var support = duo_data.support as BattleUnit3D
+	
+	print("[Battle] 👥 Duo formé : ", leader.unit_name, " + ", support.unit_name)
+	EventBus.notify("Duo formé : " + leader.unit_name + " + " + support.unit_name, "success")
+
+func _on_duo_broken(duo_id: String) -> void:
+	print("[Battle] 💔 Duo rompu : ", duo_id)
+
+func _on_duo_validation_failed(reason: String) -> void:
+	EventBus.notify("Formation de duo impossible : " + reason, "warning")
