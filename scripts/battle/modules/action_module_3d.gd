@@ -88,7 +88,7 @@ func execute_attack(attacker: BattleUnit3D, target: BattleUnit3D, duo_partner: B
 # ✅ NOUVELLE FONCTION
 func _spawn_damage_number(target: BattleUnit3D, damage: int) -> void:
 	"""Crée un nombre de dégâts animé au-dessus de la cible"""
-	var damage_number = preload("res://scenes/battle/damage_number.gd").new()
+	var damage_number = preload("res://scripts/battle/entities/damage_number.gd").new()
 	
 	# Position de spawn : au-dessus de l'unité
 	var spawn_pos = target.global_position + Vector3(0, 2.0, 0)

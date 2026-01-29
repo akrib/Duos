@@ -1,6 +1,6 @@
 [gd_scene load_steps=3 format=3 uid="uid://4bj7etivw784"]
 
-[ext_resource type="Script" uid="uid://b40h4cjwiukga" path="res://scenes/battle/battle_map_manager_3d.gd" id="1_manager"]
+[ext_resource type="Script" uid="uid://b40h4cjwiukga" path="res://scripts/battle/battle_map_manager_3d.gd" id="1_manager"]
 [ext_resource type="PackedScene" uid="uid://byp8xytm75beo" path="res://scenes/ui/dialogue_box.tscn" id="2_x1cvm"]
 
 [node name="BattleMap3D" type="Node3D"]

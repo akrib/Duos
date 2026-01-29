@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://team_roster_ui"]
 
-[ext_resource type="Script" path="res://scenes/team/team_roster_ui.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/ui/team_roster_ui.gd" id="1"]
 
 [node name="TeamRosterUI" type="Control"]
 layout_mode = 3
