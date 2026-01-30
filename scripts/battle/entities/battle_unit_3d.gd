@@ -37,6 +37,15 @@ const SHADOW_OPACITY: float = 0.3
 const HP_BAR_WIDTH_RATIO: float = 0.8
 const HP_BAR_HEIGHT_OFFSET: float = 0.6
 
+
+const AURA_PETAL_COUNT := 6
+const AURA_HEIGHT := 2.5
+const AURA_BASE_RADIUS := 0.4
+const AURA_RADIUS_STEP := 0.15
+const AURA_ALPHA_MIN := 0.15
+const AURA_ALPHA_MAX := 0.45
+
+
 # Couleurs du torus
 const TORUS_COLORS: Dictionary = {
 	TorusState.CAN_ACT_AND_MOVE: Color.GREEN,
@@ -849,39 +858,91 @@ func _exit_tree() -> void:
 	
 	GlobalLogger.debug("BATTLE_UNIT", "Unité %s nettoyée" % unit_name)
 
-
 func show_duo_aura(is_enemy_duo: bool = false) -> void:
-	"""Affiche une aura temporaire pour indiquer participation à un duo"""
+	"""Affiche une aura cylindrique avec dégradé vertical"""
 	
 	if not sprite_3d:
 		return
 	
-	# Créer un sprite d'aura temporaire
-	var aura = Sprite3D.new()
-	aura.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	aura.texture = _create_aura_texture(is_enemy_duo)
-	aura.pixel_size = 0.05
-	aura.position.y = sprite_height
-	aura.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	aura.modulate.a = 0.0
+	# Créer un cylindre pour l'aura
+	var aura = MeshInstance3D.new()
 	aura.name = "DuoAura"
 	
-	add_child(aura)
+	# Mesh cylindrique
+	var cylinder = CylinderMesh.new()
 	
-	# Animation de l'aura
+	cylinder.top_radius = 0.6  # Rayon réduit
+	cylinder.bottom_radius = 0.6
+	cylinder.height = 2.5 
+	cylinder.radial_segments = 32
+	cylinder.rings = 8  # Pour un meilleur dégradé
+	
+	aura.mesh = cylinder
+	
+	# Position : centré au sol, monte jusqu'à mi-hauteur
+	aura.position.y = 0
+	
+	# Material avec dégradé vertical
+	var material = StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	material.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	material.no_depth_test = false # optionnel
+		
+	# Couleur selon le type de duo
+	var base_color = Color(1.0, 0.2, 0.2, 0.6) if is_enemy_duo else Color(0.2, 0.6, 1.0, 0.6)
+	
+	# Créer un gradient texture pour le dégradé vertical
+	var gradient_texture = _create_vertical_gradient_texture(base_color)
+	material.albedo_texture = gradient_texture
+	material.albedo_color = Color.WHITE
+	
+	material.emission_enabled = true
+	material.emission = base_color * 0.5
+	material.emission_texture = gradient_texture
+	
+	aura.set_surface_override_material(0, material)
+	aura.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	
+	add_child(aura)
+	_create_conic_petals_aura(aura, base_color)
+	# Animation de l'aura (pulse doux)
 	var tween = aura.create_tween()
 	tween.set_loops()
 	
 	# Fade in
-	tween.tween_property(aura, "modulate:a", 0.8, 0.3)
-	# Pulse
-	tween.tween_property(aura, "scale", Vector3(1.2, 1.2, 1.2), 0.5).set_ease(Tween.EASE_IN_OUT)
-	tween.tween_property(aura, "scale", Vector3(1.0, 1.0, 1.0), 0.5).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(material, "albedo_color:a", 0.8, 0.3)
+	# Pulse scale légèrement
+	tween.tween_property(aura, "scale", Vector3(1.1, 1.0, 1.1), 0.8).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(aura, "scale", Vector3(1.0, 1.0, 1.0), 0.8).set_ease(Tween.EASE_IN_OUT)
 	
 	# Stocker la référence pour suppression
 	set_meta("duo_aura", aura)
 	set_meta("duo_aura_tween", tween)
-
+	
+func _create_vertical_gradient_texture(base_color: Color) -> ImageTexture:
+	"""Crée une texture avec dégradé vertical (transparent en bas, opaque en haut)"""
+	
+	var size = 256
+	var image = Image.create(size, size, false, Image.FORMAT_RGBA8)
+	
+	for y in range(size):
+		# Gradient vertical : 0.0 en bas (y=255) → 1.0 en haut (y=0)
+		var gradient_factor = 1.0 - (float(y) / float(size))
+		
+		# Alpha augmente du bas vers le haut
+		var alpha = gradient_factor * base_color.a
+		
+		# Couleur avec alpha graduel
+		var pixel_color = Color(base_color.r, base_color.g, base_color.b, alpha)
+		
+		for x in range(size):
+			image.set_pixel(x, y, pixel_color)
+	
+	return ImageTexture.create_from_image(image)
+	
+	
 func hide_duo_aura() -> void:
 	"""Supprime l'aura de duo"""
 	
@@ -900,26 +961,56 @@ func hide_duo_aura() -> void:
 		if tween and tween.is_valid():
 			tween.kill()
 		remove_meta("duo_aura_tween")
+		
+		
 
-func _create_aura_texture(is_enemy: bool) -> ImageTexture:
-	"""Crée une texture d'aura circulaire"""
+
+
+		
+func _create_conic_petals_aura(parent: Node3D, base_color: Color) -> void:
+	"""
+	Crée plusieurs cônes translucides formant une aura en rose
+	"""
 	
-	var size = 256
-	var image = Image.create(size, size, false, Image.FORMAT_RGBA8)
-	image.fill(Color.TRANSPARENT)
-	
-	var center = size / 2
-	var color = Color(1.0, 0.2, 0.2, 1.0) if is_enemy else Color(0.2, 0.6, 1.0, 1.0)
-	
-	for y in range(size):
-		for x in range(size):
-			var dx = x - center
-			var dy = y - center
-			var dist = sqrt(dx*dx + dy*dy)
-			
-			# Anneau avec dégradé
-			if dist > center * 0.6 and dist < center:
-				var alpha = 1.0 - (dist - center * 0.6) / (center * 0.4)
-				image.set_pixel(x, y, Color(color.r, color.g, color.b, alpha))
-	
-	return ImageTexture.create_from_image(image)
+	for i in range(AURA_PETAL_COUNT):
+		var petal := MeshInstance3D.new()
+		petal.name = "AuraPetal_%d" % i
+		
+		var t := float(i) / float(AURA_PETAL_COUNT - 1) # 0 → 1
+		
+		# --- Mesh conique ---
+		var cone := CylinderMesh.new()
+		cone.height = AURA_HEIGHT / t
+		cone.bottom_radius = AURA_BASE_RADIUS * 0.4
+		cone.top_radius = AURA_BASE_RADIUS + AURA_RADIUS_STEP * i
+		cone.radial_segments = 24
+		cone.rings = 8
+		
+		petal.mesh = cone
+		
+		# --- Position ---
+		petal.position.y = 0
+		
+		# Légère rotation pour effet "rose"
+		petal.rotation.y = deg_to_rad((360.0 / AURA_PETAL_COUNT) * i)
+		
+		# --- Matériau ---
+		var mat := StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+		mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		
+		# Plus le cône est large, plus il est clair
+		var alpha: float = lerp(AURA_ALPHA_MIN, AURA_ALPHA_MAX, t)
+		var color: Color = base_color.lightened(t * 0.4)
+		color.a = alpha
+
+		mat.albedo_color = color
+		mat.emission_enabled = true
+		mat.emission = color * 0.6
+		
+		petal.set_surface_override_material(0, mat)
+		petal.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		
+		parent.add_child(petal)

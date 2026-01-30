@@ -156,6 +156,29 @@ func find_best_attack_target(unit: BattleUnit3D) -> BattleUnit3D:
 	
 	return best_target
 
+func _can_form_duo_with_any_ally(unit: BattleUnit3D) -> bool:
+	"""Vérifie si l'unité peut former un duo avec AU MOINS un allié vivant"""
+	
+	var enemies = unit_manager.get_alive_enemy_units()
+	
+	for ally in enemies:
+		if ally == unit:
+			continue
+		
+		# Vérifier si l'allié peut encore agir
+		if not ally.can_act():
+			continue
+		
+		# Vérifier l'adjacence cardinale
+		if not _is_cardinal_adjacent(unit.grid_position, ally.grid_position):
+			continue
+		
+		# Duo possible trouvé
+		return true
+	
+	# Aucun duo possible
+	return false
+
 func _evaluate_target(attacker: BattleUnit3D, target: BattleUnit3D) -> float:
 	var score = 0.0
 	
@@ -221,17 +244,31 @@ func _execute_ai_action(unit: BattleUnit3D, decision: Dictionary) -> void:
 			var duo_partner = decision.get("duo_partner")
 			
 			if target and action_module.can_attack(unit, target):
+				# ✅ NOUVELLE RÈGLE : Si pas de partenaire trouvé, vérifier s'il y a d'autres alliés
+				if not duo_partner:
+					# Compter les alliés vivants
+					var alive_allies = unit_manager.get_alive_enemy_units()
+					
+					# S'il y a plus d'un ennemi vivant (l'unité elle-même + au moins un autre)
+					if alive_allies.size() > 1:
+						# Vérifier si on PEUT former un duo avec quelqu'un
+						if _can_form_duo_with_any_ally(unit):
+							print("[AIModule3D] ⚠️ Attaque solo refusée : duo possible avec un allié")
+							# Ne PAS attaquer, passer le tour
+							ai_action_taken.emit(unit, "wait")
+							return
+				
+				# Si on arrive ici, soit on a un partenaire, soit on est le dernier survivant
 				if duo_partner:
-					# ✅ Vérifier seulement l'adjacence cardinale
+					# Vérifier adjacence et si le partenaire peut agir
 					if _is_cardinal_adjacent(unit.grid_position, duo_partner.grid_position):
-						# ✅ NOUVEAU : Vérifier que le partenaire peut encore agir
 						if duo_partner.can_act():
 							print("[AIModule3D] 💫 Duo IA temporaire : ", unit.unit_name, " + ", duo_partner.unit_name)
-							# ✅ MARQUER LE PARTENAIRE COMME AYANT AGI
+							# Marquer le partenaire comme ayant agi
 							duo_partner.action_used = true
 							duo_partner.movement_used = true
 						else:
-							# Le partenaire ne peut plus agir, annuler le duo
+							# Le partenaire ne peut plus agir
 							duo_partner = null
 					else:
 						duo_partner = null
@@ -241,7 +278,7 @@ func _execute_ai_action(unit: BattleUnit3D, decision: Dictionary) -> void:
 		
 		"wait":
 			ai_action_taken.emit(unit, "wait")
-			
+
 # ============================================================================
 # UTILITAIRES
 # ============================================================================

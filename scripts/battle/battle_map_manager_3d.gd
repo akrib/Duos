@@ -1166,14 +1166,32 @@ func _end_battle(victory: bool) -> void:
 		change_phase(TurnPhase.CUTSCENE)
 		await json_scenario_module.play_outro(victory)
 	
+	# Récupérer les stats de combat
 	var battle_stats = stats_tracker.get_final_stats()
+	
+	# Calculer l'XP gagné
+	var xp_earned = 0
+	if victory:
+		var global_stats = battle_stats.get("global", {})
+		var turns = global_stats.get("turns_elapsed", 1)
+		var enemies_killed = global_stats.get("units_killed", 0)
+		
+		# Formule : 50 XP de base + 10 par ennemi + bonus rapidité
+		xp_earned = 50 + (enemies_killed * 10)
+		
+		if turns < 10:
+			xp_earned += 50  # Bonus victoire rapide
+	
+	# Construire les résultats avec toutes les infos nécessaires
 	var results = {
 		"victory": victory,
+		"battle_title": battle_data.get("battle_title", "Combat Tactique"),
 		"turns": current_turn,
 		"stats": battle_stats,
 		"objectives": objective_module.get_completion_status(),
 		"mvp": stats_tracker.get_mvp(),
-		"rewards": _calculate_rewards(victory, battle_stats)
+		"rewards": _calculate_rewards(victory, battle_stats),
+		"xp_earned": xp_earned
 	}
 	
 	EventBus.battle_ended.emit(results)
@@ -1183,8 +1201,13 @@ func _end_battle(victory: bool) -> void:
 	else:
 		EventBus.notify("Défaite...", "error")
 	
+	# Stocker les résultats pour l'écran de résultats
+	BattleDataManager.store_battle_results(results)
+	
 	await get_tree().create_timer(2.0).timeout
-	EventBus.change_scene(SceneRegistry.SceneID.WORLD_MAP)
+	
+	# Aller à l'écran de résultats
+	EventBus.change_scene(SceneRegistry.SceneID.BATTLE_RESULTS)
 
 func _award_xp_to_survivors() -> void:
 	var player_units = unit_manager.get_alive_player_units()
@@ -1287,3 +1310,9 @@ func _on_undo_pressed() -> void:
 func _exit_tree() -> void:
 	EventBus.disconnect_all(self)
 	GlobalLogger.info("BATTLE", "BattleMapManager3D nettoyé")
+
+
+func store_battle_results(results: Dictionary) -> void:
+	"""Stocke les résultats du combat pour l'écran de résultats"""
+	battle_data["results"] = results
+	print("[BattleDataManager] Résultats de combat stockés")
