@@ -823,108 +823,99 @@ func _open_duo_selection_menu() -> void:
 	var allies = unit_manager.get_alive_player_units()
 	var enemies = unit_manager.get_alive_enemy_units()
 	
-	# ✅ Calculer les conditions d'attaque solo
-	var can_duo = allies.size() > 1  # Au moins 2 alliés pour former un duo
-	var force_solo = (allies.size() == 1) or (enemies.size() == 1)  # Solo forcé
+	# ✅ Solo uniquement si dernier survivant
+	var is_last_survivor = allies.size() == 1
+	var can_form_duo = allies.size() > 1
 	
 	# Nettoyer les options précédentes
 	for child in duo_options_container.get_children():
 		child.queue_free()
 	
-	# Mettre à jour la carte du leader
+	# Mettre à jour les DEUX mini-cartes dès le début
 	if leader_mini_card:
 		leader_mini_card.setup_from_unit(selected_unit)
 	
-	# ✅ CORRECTION MAJEURE : Générer les options Mana + Arme
-	if can_duo:
-		var duo_candidates: Array[BattleUnit3D] = []
+	# Pré-remplir la carte support avec le premier partenaire disponible
+	if can_form_duo:
+		var first_partner: BattleUnit3D = null
 		
-		# Trouver les partenaires à portée
 		for ally in allies:
 			if ally == selected_unit:
 				continue
 			
 			var distance = terrain_module.get_distance(
-				selected_unit.grid_position, 
+				selected_unit.grid_position,
 				ally.grid_position
 			)
 			
-			if distance <= 3:  # Distance max pour duo
+			if distance <= 3:
+				first_partner = ally
+				break
+		
+		if first_partner and support_mini_card:
+			support_mini_card.setup_from_unit(first_partner)
+	
+	# Générer les options de duo
+	if can_form_duo:
+		var duo_candidates: Array[BattleUnit3D] = []
+		
+		for ally in allies:
+			if ally == selected_unit:
+				continue
+			
+			var distance = terrain_module.get_distance(
+				selected_unit.grid_position,
+				ally.grid_position
+			)
+			
+			if distance <= 3:
 				duo_candidates.append(ally)
 		
-		# Créer une option pour chaque partenaire
+		# Créer les options
 		for partner in duo_candidates:
-			# Récupérer les anneaux équipés
-			var leader_rings = _get_unit_equipped_rings(selected_unit)
-			var partner_rings = _get_unit_equipped_rings(partner)
+			# Récupérer les vrais anneaux
+			var leader_ring_data = _get_ring_data_from_unit(selected_unit, "mat")
+			var partner_ring_data = _get_ring_data_from_unit(partner, "chan")
 			
-			# Créer une option pour chaque combinaison
-			for leader_combo in leader_rings:
-				for partner_combo in partner_rings:
-					var duo_option = DUO_ATTACK_OPTION_SCENE.instantiate()
-					
-					# Données Mana (support)
-					var mana_data = {
-						"ring_id": partner_combo["channeling_ring_id"],
-						"ring_name": partner_combo["channeling_ring_name"],
-						"icon": partner_combo.get("channeling_icon", "")
-					}
-					
-					# Données Arme (leader)
-					var weapon_data = {
-						"ring_id": leader_combo["materialization_ring_id"],
-						"ring_name": leader_combo["materialization_ring_name"],
-						"icon": leader_combo.get("materialization_icon", "")
-					}
-					
-					# Configuration de l'option
-					duo_option.setup(mana_data, weapon_data)
-					
-					# Connexion : sélection
-					duo_option.option_selected.connect(
-						func(mana_id, weapon_id):
-							_on_duo_option_selected(partner, {
-								"mana_ring": mana_id,
-								"weapon_ring": weapon_id
-							})
-					)
-					
-					# Connexion : survol (met à jour la carte support)
-					duo_option.option_hovered.connect(
-						func(): 
-							if support_mini_card:
-								support_mini_card.setup_from_unit(partner)
-					)
-					
-					duo_options_container.add_child(duo_option)
+			var duo_option = DUO_ATTACK_OPTION_SCENE.instantiate()
+			
+			# ✅ CORRECTION : Ajouter AVANT d'appeler setup()
+			duo_options_container.add_child(duo_option)
+			
+			# ✅ Maintenant on peut appeler setup() en toute sécurité
+			duo_option.setup(partner_ring_data, leader_ring_data)
+			
+			# Connexion : sélection
+			duo_option.option_selected.connect(
+				func(mana_id, weapon_id):
+					_on_duo_option_selected(partner, {
+						"mana_ring": mana_id,
+						"weapon_ring": weapon_id
+					})
+			)
+			
+			# Connexion : survol (met à jour la carte support)
+			duo_option.option_hovered.connect(
+				func():
+					if support_mini_card:
+						support_mini_card.setup_from_unit(partner)
+			)
 	
-	# ✅ CORRECTION : Affichage conditionnel du bouton solo
-	if force_solo:
-		solo_button_duo.visible = true
-		
-		if allies.size() == 1:
-			solo_button_duo.text = "⚔️ Attaquer (Dernier survivant)"
-		elif enemies.size() == 1:
-			solo_button_duo.text = "⚔️ Attaquer (Dernier ennemi)"
-	elif can_duo:
-		# Solo optionnel si des duos sont possibles
-		solo_button_duo.visible = true
-		solo_button_duo.text = "🚶 Attaquer Seul"
-	else:
-		# Pas d'alliés à portée, solo par défaut
-		solo_button_duo.visible = true
-		solo_button_duo.text = "⚔️ Attaquer"
+	# Bouton solo seulement si dernier survivant
+	solo_button_duo.visible = is_last_survivor
 	
-	# Positionner et afficher le popup
+	if is_last_survivor:
+		solo_button_duo.text = "⚔️ Attaquer (Dernier survivant)"
+	
+	# Positionner et afficher
 	var screen_pos = camera.unproject_position(selected_unit.position)
 	duo_popup.position = screen_pos + Vector2(50, -200)
 	duo_popup.popup()
 	
 	current_action_state = ActionState.CHOOSING_DUO
 	
-	print("[BattleMap] Menu duo ouvert - Alliés: ", allies.size(), ", Ennemis: ", enemies.size())
-
-
+	print("[BattleMap] Menu duo ouvert - Options: ", duo_options_container.get_child_count())
+	
 func _on_duo_option_selected(partner: BattleUnit3D, ring_combo: Dictionary) -> void:
 	"""Appelé quand l'utilisateur sélectionne une option Mana + Arme"""
 	
@@ -934,6 +925,9 @@ func _on_duo_option_selected(partner: BattleUnit3D, ring_combo: Dictionary) -> v
 	if not success:
 		EventBus.notify("Impossible de former ce duo", "error")
 		return
+	
+	# ✅ NOUVEAU : Effet de bounce sur les deux unités
+	_play_duo_formation_effect(selected_unit, partner)
 	
 	# Stocker les données du duo
 	duo_partner = partner
@@ -952,6 +946,43 @@ func _on_duo_option_selected(partner: BattleUnit3D, ring_combo: Dictionary) -> v
 	)
 	
 	print("[BattleMap] Duo formé avec anneaux : ", ring_combo)
+
+func _play_duo_formation_effect(leader: BattleUnit3D, support: BattleUnit3D) -> void:
+	"""Anime un effet de bounce sur les deux unités du duo"""
+	
+	var duration = 0.4
+	var scale_factor = 1.3
+	
+	# Leader
+	var tween_leader = leader.create_tween()
+	tween_leader.set_parallel(true)
+	tween_leader.tween_property(leader, "scale", Vector3.ONE * scale_factor, duration / 2).set_ease(Tween.EASE_OUT)
+	tween_leader.tween_property(leader, "position:y", leader.position.y + 0.5, duration / 2).set_ease(Tween.EASE_OUT)
+	tween_leader.set_parallel(false)
+	tween_leader.tween_property(leader, "scale", Vector3.ONE, duration / 2).set_ease(Tween.EASE_IN)
+	tween_leader.tween_property(leader, "position:y", leader.position.y, duration / 2).set_ease(Tween.EASE_IN)
+	
+	# Support (légèrement décalé)
+	await get_tree().create_timer(0.1).timeout
+	
+	var tween_support = support.create_tween()
+	tween_support.set_parallel(true)
+	tween_support.tween_property(support, "scale", Vector3.ONE * scale_factor, duration / 2).set_ease(Tween.EASE_OUT)
+	tween_support.tween_property(support, "position:y", support.position.y + 0.5, duration / 2).set_ease(Tween.EASE_OUT)
+	tween_support.set_parallel(false)
+	tween_support.tween_property(support, "scale", Vector3.ONE, duration / 2).set_ease(Tween.EASE_IN)
+	tween_support.tween_property(support, "position:y", support.position.y, duration / 2).set_ease(Tween.EASE_IN)
+	
+	# Effet visuel supplémentaire (optionnel)
+	if leader.sprite_3d:
+		var sprite_tween = leader.sprite_3d.create_tween()
+		sprite_tween.tween_property(leader.sprite_3d, "modulate", Color(1, 1, 0.5), 0.2)
+		sprite_tween.tween_property(leader.sprite_3d, "modulate", Color.WHITE, 0.2)
+	
+	if support.sprite_3d:
+		var sprite_tween2 = support.sprite_3d.create_tween()
+		sprite_tween2.tween_property(support.sprite_3d, "modulate", Color(0.5, 1, 1), 0.2)
+		sprite_tween2.tween_property(support.sprite_3d, "modulate", Color.WHITE, 0.2)
 
 func _on_duo_option_hovered(partner: BattleUnit3D) -> void:
 	"""Mise à jour de la carte Support au survol"""
@@ -1042,14 +1073,24 @@ func _attack_unit(attacker: BattleUnit3D, target: BattleUnit3D) -> void:
 		print("[BattleMapManager3D] Attaque en duo!")
 	
 	await action_module.execute_attack(attacker, target)
+	
+	# ✅ CORRECTION : Consommer les actions des DEUX unités
 	attacker.action_used = true
+	attacker.movement_used = true
 	
 	if duo_partner:
+		duo_partner.action_used = true
+		duo_partner.movement_used = true
+		
+		# ✅ Mettre à jour les torus des deux unités
+		attacker.update_torus_state(true)
+		duo_partner.update_torus_state(true)
+		
 		EventBus.break_duo(attacker, duo_partner)
 	
 	_close_all_menus()
 	_deselect_unit()
-
+	
 # ============================================================================
 # CALLBACKS
 # ============================================================================
@@ -1235,3 +1276,49 @@ func _find_potential_duo_partners(leader: BattleUnit3D) -> Array[BattleUnit3D]:
 	#if ring.has("icon"):
 		#return ring.icon
 	#return ""
+	
+func _get_ring_data_from_unit(unit: BattleUnit3D, ring_type: String) -> Dictionary:
+	"""Récupère les données d'anneau depuis une unité"""
+	
+	var ring_id: String = ""
+	
+	# Récupérer l'anneau équipé
+	if ring_type == "mat":
+		ring_id = unit.equipped_materialization_ring
+	elif ring_type == "chan":
+		ring_id = unit.equipped_channeling_ring
+	
+	# Charger les données depuis RingSystem
+	if ring_system:
+		if ring_type == "mat":
+			var ring = ring_system.get_materialization_ring(ring_id)
+			if ring:
+				return {
+					"ring_id": ring.ring_id,
+					"ring_name": ring.ring_name,
+					"icon": ""
+				}
+		elif ring_type == "chan":
+			var ring = ring_system.get_channeling_ring(ring_id)
+			if ring:
+				return {
+					"ring_id": ring.ring_id,
+					"ring_name": ring.ring_name,
+					"icon": ""
+				}
+	
+	# Fallback avec noms lisibles
+	var fallback_names = {
+		"mat_basic_line": "Lame Basique",
+		"mat_cone": "Cône d'Attaque",
+		"mat_cross": "Croix Sacrée",
+		"chan_fire": "Feu",
+		"chan_ice": "Glace",
+		"chan_neutral": "Neutre"
+	}
+	
+	return {
+		"ring_id": ring_id,
+		"ring_name": fallback_names.get(ring_id, ring_id),
+		"icon": ""
+	}

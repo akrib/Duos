@@ -1,0 +1,13 @@
+[gd_scene load_steps=2 format=3 uid="uid://dyfx76wnj44yh"]
+
+[ext_resource type="Texture2D" path="res://asset/unit/unit.png" id="1_tuul6"]
+
+[node name="Unit" type="Node2D"]
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture = ExtResource("1_tuul6")
+hframes = 7
+vframes = 3
+frame = 20
+region_enabled = true
+region_rect = Rect2(35, 243, 947, 648)
