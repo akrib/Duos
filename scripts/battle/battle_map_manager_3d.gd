@@ -819,52 +819,113 @@ func _open_duo_selection_menu() -> void:
 	if not selected_unit:
 		return
 	
-	# ✅ NOUVEAU : Vérifier si attaque solo est possible
 	var allies = unit_manager.get_alive_player_units()
-	var can_duo = allies.size() > 1  # Au moins 2 alliés vivants
+	var enemies = unit_manager.get_alive_enemy_units()
 	
-	# Nettoyer le container des boutons précédents - ✅ CORRIGER ICI
-	for child in duo_options_container.get_children():  # ← Changé de duo_units_container à duo_options_container
+	# ✅ Calculer les conditions d'attaque solo
+	var can_duo = allies.size() > 1  # Au moins 2 alliés pour former un duo
+	var force_solo = (allies.size() == 1) or (enemies.size() == 1)  # Solo forcé
+	
+	# Nettoyer les options précédentes
+	for child in duo_options_container.get_children():
 		child.queue_free()
 	
+	# Mettre à jour la carte du leader
+	if leader_mini_card:
+		leader_mini_card.setup_from_unit(selected_unit)
+	
+	# ✅ CORRECTION MAJEURE : Générer les options Mana + Arme
 	if can_duo:
-		# Créer boutons pour chaque allié
 		var duo_candidates: Array[BattleUnit3D] = []
 		
+		# Trouver les partenaires à portée
 		for ally in allies:
 			if ally == selected_unit:
 				continue
 			
-			var distance = terrain_module.get_distance(selected_unit.grid_position, ally.grid_position)
-			if distance <= 3:
+			var distance = terrain_module.get_distance(
+				selected_unit.grid_position, 
+				ally.grid_position
+			)
+			
+			if distance <= 3:  # Distance max pour duo
 				duo_candidates.append(ally)
 		
-		for candidate in duo_candidates:
-			var button = Button.new()
-			button.text = "👥 " + candidate.unit_name
-			button.custom_minimum_size = Vector2(180, 40)
-			button.pressed.connect(func(): _select_duo_partner(candidate))
-			duo_options_container.add_child(button)  # ← Changé de duo_units_container à duo_options_container
+		# Créer une option pour chaque partenaire
+		for partner in duo_candidates:
+			# Récupérer les anneaux équipés
+			var leader_rings = _get_unit_equipped_rings(selected_unit)
+			var partner_rings = _get_unit_equipped_rings(partner)
+			
+			# Créer une option pour chaque combinaison
+			for leader_combo in leader_rings:
+				for partner_combo in partner_rings:
+					var duo_option = DUO_ATTACK_OPTION_SCENE.instantiate()
+					
+					# Données Mana (support)
+					var mana_data = {
+						"ring_id": partner_combo["channeling_ring_id"],
+						"ring_name": partner_combo["channeling_ring_name"],
+						"icon": partner_combo.get("channeling_icon", "")
+					}
+					
+					# Données Arme (leader)
+					var weapon_data = {
+						"ring_id": leader_combo["materialization_ring_id"],
+						"ring_name": leader_combo["materialization_ring_name"],
+						"icon": leader_combo.get("materialization_icon", "")
+					}
+					
+					# Configuration de l'option
+					duo_option.setup(mana_data, weapon_data)
+					
+					# Connexion : sélection
+					duo_option.option_selected.connect(
+						func(mana_id, weapon_id):
+							_on_duo_option_selected(partner, {
+								"mana_ring": mana_id,
+								"weapon_ring": weapon_id
+							})
+					)
+					
+					# Connexion : survol (met à jour la carte support)
+					duo_option.option_hovered.connect(
+						func(): 
+							if support_mini_card:
+								support_mini_card.setup_from_unit(partner)
+					)
+					
+					duo_options_container.add_child(duo_option)
 	
-	# ✅ Bouton solo (toujours disponible) - CORRIGER ICI
-	solo_button_duo.visible = true  # ← Changé de solo_button à solo_button_duo
-	solo_button_duo.text = "🚶 Attaquer Seul" if can_duo else "⚔️ Attaquer"  # ← Changé
+	# ✅ CORRECTION : Affichage conditionnel du bouton solo
+	if force_solo:
+		solo_button_duo.visible = true
+		
+		if allies.size() == 1:
+			solo_button_duo.text = "⚔️ Attaquer (Dernier survivant)"
+		elif enemies.size() == 1:
+			solo_button_duo.text = "⚔️ Attaquer (Dernier ennemi)"
+	elif can_duo:
+		# Solo optionnel si des duos sont possibles
+		solo_button_duo.visible = true
+		solo_button_duo.text = "🚶 Attaquer Seul"
+	else:
+		# Pas d'alliés à portée, solo par défaut
+		solo_button_duo.visible = true
+		solo_button_duo.text = "⚔️ Attaquer"
 	
-	# Positionner et afficher
+	# Positionner et afficher le popup
 	var screen_pos = camera.unproject_position(selected_unit.position)
 	duo_popup.position = screen_pos + Vector2(50, -200)
 	duo_popup.popup()
 	
 	current_action_state = ActionState.CHOOSING_DUO
-func _on_duo_option_hovered(partner: BattleUnit3D) -> void:
-	"""Mise à jour de la carte Support au survol"""
-	support_mini_card.setup_from_unit(partner)
+	
+	print("[BattleMap] Menu duo ouvert - Alliés: ", allies.size(), ", Ennemis: ", enemies.size())
 
-func _on_duo_option_selected(
-	partner: BattleUnit3D, 
-	ring_combo: Dictionary
-) -> void:
-	"""Option de duo sélectionnée"""
+
+func _on_duo_option_selected(partner: BattleUnit3D, ring_combo: Dictionary) -> void:
+	"""Appelé quand l'utilisateur sélectionne une option Mana + Arme"""
 	
 	# Former le duo
 	var success = duo_system.try_form_duo(selected_unit, partner)
@@ -873,18 +934,53 @@ func _on_duo_option_selected(
 		EventBus.notify("Impossible de former ce duo", "error")
 		return
 	
-	# Stocker le partenaire et la combinaison d'anneaux
+	# Stocker les données du duo
 	duo_partner = partner
-	current_attack_profile = ring_combo  # Stocker pour utilisation ultérieure
+	current_attack_profile = ring_combo
 	
-	# Fermer le popup et afficher la portée d'attaque
+	# Fermer le popup
 	duo_popup.hide()
+	
+	# Afficher la portée d'attaque
 	_show_attack_range()
 	
+	# Notification
 	EventBus.notify(
-		"Duo formé : %s + %s" % [selected_unit.unit_name, partner.unit_name],
+		"Duo : %s + %s" % [selected_unit.unit_name, partner.unit_name],
 		"info"
 	)
+	
+	print("[BattleMap] Duo formé avec anneaux : ", ring_combo)
+
+func _on_duo_option_hovered(partner: BattleUnit3D) -> void:
+	"""Mise à jour de la carte Support au survol"""
+	support_mini_card.setup_from_unit(partner)
+
+#func _on_duo_option_selected(
+	#partner: BattleUnit3D, 
+	#ring_combo: Dictionary
+#) -> void:
+	#"""Option de duo sélectionnée"""
+	#
+	## Former le duo
+	#var success = duo_system.try_form_duo(selected_unit, partner)
+	#
+	#if not success:
+		#EventBus.notify("Impossible de former ce duo", "error")
+		#return
+	#
+	## Stocker le partenaire et la combinaison d'anneaux
+	#duo_partner = partner
+	#current_attack_profile = ring_combo  # Stocker pour utilisation ultérieure
+	#
+	## Fermer le popup et afficher la portée d'attaque
+	#duo_popup.hide()
+	#_show_attack_range()
+	#
+	#EventBus.notify(
+		#"Duo formé : %s + %s" % [selected_unit.unit_name, partner.unit_name],
+		#"info"
+	#)
 
 func _clear_duo_options() -> void:
 	"""Nettoie toutes les options de duo"""
@@ -1069,25 +1165,11 @@ func _on_duo_validation_failed(reason: String) -> void:
 	EventBus.notify("Formation de duo impossible : " + reason, "warning")
 	
 func _get_unit_equipped_rings(unit: BattleUnit3D) -> Array:
-	"""
-	Récupère les anneaux équipés par une unité
-	
-	Retourne un Array de Dictionary :
-	[
-		{
-			"channeling_ring_id": "chan_fire",
-			"channeling_ring_name": "Anneau de Feu",
-			"channeling_icon": "res://...",
-			"materialization_ring_id": "mat_basic_line",
-			"materialization_ring_name": "Lame Basique",
-			"materialization_icon": "res://..."
-		}
-	]
-	"""
+	"""Récupère les anneaux équipés par une unité"""
 	
 	var combos = []
 	
-	# Méthode 1 : Via RingSystem (si implémenté)
+	# Tentative via RingSystem
 	if ring_system:
 		var rings = ring_system.get_unit_rings(unit.unit_id)
 		
@@ -1095,18 +1177,18 @@ func _get_unit_equipped_rings(unit: BattleUnit3D) -> Array:
 			var mat_ring = ring_system.get_materialization_ring(rings["mat"])
 			var chan_ring = ring_system.get_channeling_ring(rings["chan"])
 			
-			combos.append({
-				"channeling_ring_id": chan_ring.ring_id,
-				"channeling_ring_name": chan_ring.ring_name,
-				"channeling_icon": _get_ring_icon(chan_ring),
-				"materialization_ring_id": mat_ring.ring_id,
-				"materialization_ring_name": mat_ring.ring_name,
-				"materialization_icon": _get_ring_icon(mat_ring)
-			})
+			if mat_ring and chan_ring:
+				combos.append({
+					"channeling_ring_id": chan_ring.ring_id,
+					"channeling_ring_name": chan_ring.ring_name,
+					"channeling_icon": _get_ring_icon(chan_ring),
+					"materialization_ring_id": mat_ring.ring_id,
+					"materialization_ring_name": mat_ring.ring_name,
+					"materialization_icon": _get_ring_icon(mat_ring)
+				})
 	
-	# Méthode 2 : Via metadata de l'unité (fallback)
+	# Fallback : Anneaux par défaut
 	if combos.is_empty():
-		# Données par défaut (à personnaliser)
 		combos.append({
 			"channeling_ring_id": "chan_fire",
 			"channeling_ring_name": "Feu Basique",
@@ -1117,6 +1199,12 @@ func _get_unit_equipped_rings(unit: BattleUnit3D) -> Array:
 		})
 	
 	return combos
+
+func _get_ring_icon(ring) -> String:
+	"""Retourne l'icône d'un anneau si disponible"""
+	if ring and typeof(ring) == TYPE_OBJECT and ring.has("icon"):
+		return ring.icon
+	return ""
 
 func _find_potential_duo_partners(leader: BattleUnit3D) -> Array[BattleUnit3D]:
 	"""Trouve les partenaires potentiels pour un duo"""
@@ -1141,8 +1229,8 @@ func _find_potential_duo_partners(leader: BattleUnit3D) -> Array[BattleUnit3D]:
 	
 	return partners
 
-func _get_ring_icon(ring: RingSystem) -> String:
-	"""Retourne l'icône de l'anneau ou une chaîne vide"""
-	if ring.has("icon"):
-		return ring.icon
-	return ""
+#func _get_ring_icon(ring: RingSystem) -> String:
+	#"""Retourne l'icône de l'anneau ou une chaîne vide"""
+	#if ring.has("icon"):
+		#return ring.icon
+	#return ""

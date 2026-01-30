@@ -1,6 +1,7 @@
-[gd_scene load_steps=4 format=3 uid="uid://duo_attack_option"]
+[gd_scene load_steps=5 format=3 uid="uid://dybg67mpfp24s"]
 
-[ext_resource type="Script" path="res://scripts/ui/duo_attack_option.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://brfcaxpj2r8a4" path="res://scripts/ui/duo_attack_option.gd" id="1_script"]
+[ext_resource type="Texture2D" uid="uid://c8chvygqvhoci" path="res://icon.svg" id="2_hxtut"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_mana"]
 bg_color = Color(0.2, 0.3, 0.6, 0.8)
@@ -61,6 +62,7 @@ visible = false
 custom_minimum_size = Vector2(48, 48)
 layout_mode = 2
 size_flags_horizontal = 4
+texture = ExtResource("2_hxtut")
 expand_mode = 1
 stretch_mode = 5
 
@@ -93,6 +95,7 @@ visible = false
 custom_minimum_size = Vector2(48, 48)
 layout_mode = 2
 size_flags_horizontal = 4
+texture = ExtResource("2_hxtut")
 expand_mode = 1
 stretch_mode = 5
 

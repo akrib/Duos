@@ -17,7 +17,7 @@ signal option_hovered()
 
 @onready var button: Button = $Button
 @onready var mana_panel: PanelContainer = $Button/HBoxContainer/ManaPanel
-@ontml:parameter>
+#@ontml:parameter>
 @onready var mana_icon: TextureRect = $Button/HBoxContainer/ManaPanel/MarginContainer/VBoxContainer/ManaIcon
 @onready var mana_label: Label = $Button/HBoxContainer/ManaPanel/MarginContainer/VBoxContainer/ManaLabel
 
@@ -78,6 +78,11 @@ func setup(mana_data: Dictionary, weapon_data: Dictionary) -> void:
 func _setup_mana_panel() -> void:
 	"""Configure le panneau de gauche (Mana)"""
 	
+	# ✅ VÉRIFICATION : S'assurer que les nœuds existent
+	if not mana_icon or not mana_label:
+		push_warning("[DuoAttackOption] Nœuds mana non trouvés")
+		return
+	
 	var mana_name = mana_ring_data.get("ring_name", "Mana")
 	var mana_icon_path = mana_ring_data.get("icon", "")
 	
@@ -96,6 +101,11 @@ func _setup_mana_panel() -> void:
 func _setup_weapon_panel() -> void:
 	"""Configure le panneau de droite (Arme)"""
 	
+	# ✅ VÉRIFICATION : S'assurer que les nœuds existent
+	if not weapon_icon or not weapon_label:
+		push_warning("[DuoAttackOption] Nœuds weapon non trouvés")
+		return
+	
 	var weapon_name = weapon_ring_data.get("ring_name", "Arme")
 	var weapon_icon_path = weapon_ring_data.get("icon", "")
 	
@@ -113,16 +123,21 @@ func _setup_weapon_panel() -> void:
 
 func _fallback_mana_text(name: String) -> void:
 	"""Affiche le nom en texte si pas d'icône"""
+	if not mana_icon or not mana_label:
+		return
+	
 	mana_icon.visible = false
 	mana_label.visible = true
 	mana_label.text = name
 
 func _fallback_weapon_text(name: String) -> void:
 	"""Affiche le nom en texte si pas d'icône"""
+	if not weapon_icon or not weapon_label:
+		return
+	
 	weapon_icon.visible = false
 	weapon_label.visible = true
 	weapon_label.text = name
-
 # ============================================================================
 # CALLBACKS
 # ============================================================================

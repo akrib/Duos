@@ -209,7 +209,6 @@ func get_unit_summaries() -> Array[Dictionary]:
 		})
 
 	return summaries
-	return summaries
 
 func _calculate_unit_score(stats: Dictionary) -> float:
 	"""Calcule un score individuel pour une unité"""

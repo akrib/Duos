@@ -122,14 +122,20 @@ func _convert_json_positions(data: Dictionary) -> Dictionary:
 		for unit in result.player_units:
 			if unit.has("position"):
 				var pos = unit.position
-				unit.position = Vector2i(pos.x, pos.y)
+				if pos is Array and pos.size() == 2:
+					unit.position = Vector2i(int(pos[0]), int(pos[1]))
+				elif pos is Dictionary:
+					unit.position = Vector2i(pos.get("x", 0), pos.get("y", 0))
 	
 	# Enemy units
 	if result.has("enemy_units"):
 		for unit in result.enemy_units:
 			if unit.has("position"):
 				var pos = unit.position
-				unit.position = Vector2i(pos.x, pos.y)
+				if pos is Array and pos.size() == 2:
+					unit.position = Vector2i(int(pos[0]), int(pos[1]))
+				elif pos is Dictionary:
+					unit.position = Vector2i(pos.get("x", 0), pos.get("y", 0))
 	
 	return result
 

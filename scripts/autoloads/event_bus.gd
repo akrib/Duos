@@ -75,7 +75,6 @@ signal chapter_changed(chapter_id: int)
 # MÉTHODES UTILITAIRES
 # ============================================================================
 
-## Émettre un événement avec log optionnel
 func emit_event(event_name: String, args: Array = [], debug: bool = false) -> void:
 	if not has_signal(event_name):
 		push_warning("[EventBus] Signal introuvable : ", event_name)
@@ -84,13 +83,7 @@ func emit_event(event_name: String, args: Array = [], debug: bool = false) -> vo
 	if debug:
 		print("[EventBus] Émission : ", event_name, " avec args : ", args)
 	
-	match args.size():
-		0: emit_signal(event_name)
-		1: emit_signal(event_name, args[0])
-		2: emit_signal(event_name, args[0], args[1])
-		3: emit_signal(event_name, args[0], args[1], args[2])
-		4: emit_signal(event_name, args[0], args[1], args[2], args[3])
-		_: push_error("[EventBus] Trop d'arguments pour : ", event_name)
+	callv("emit_signal", [event_name] + args)
 
 ## Connexion sécurisée avec vérification
 func safe_connect(signal_name: String, callable: Callable, flags: int = 0) -> void:
@@ -103,11 +96,6 @@ func safe_connect(signal_name: String, callable: Callable, flags: int = 0) -> vo
 		return
 	
 	connect(signal_name, callable, flags)
-	
-	# NOUVEAU : Si c'est battle_started et qu'on a des données en attente, les envoyer immédiatement
-	#if signal_name == "battle_started" and _battle_data_ready:
-		#print("[EventBus] ✅ Listener de combat connecté, envoi des données en attente")
-		#callable.call(_pending_battle_data)
 
 
 ## Déconnexion sécurisée
@@ -156,8 +144,6 @@ func break_duo(unit_a: Node, unit_b: Node) -> void:
 func attack(attacker: Node, target: Node, damage: int) -> void:
 	unit_attacked.emit(attacker, target, damage)
 
-	#_pending_battle_data.clear()
-	#_battle_data_ready = false
 	#print("[EventBus] 🧹 Données de combat nettoyées")
 
 ## Fin de combat
