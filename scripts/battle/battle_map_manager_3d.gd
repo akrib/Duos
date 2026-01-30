@@ -57,10 +57,12 @@ enum ActionState {
 @onready var cancel_button: Button = $UILayer/BattleUI/ActionPopup/VBoxContainer/CancelButton
 
 # Menu de sélection de duo
-@onready var duo_popup: PopupPanel = $UILayer/BattleUI/DuoSelectionPopup
+#@onready var duo_popup: PopupPanel = $UILayer/BattleUI/DuoSelectionPopup
 @onready var duo_units_container: VBoxContainer = $UILayer/BattleUI/DuoSelectionPopup/VBoxContainer/UnitsContainer
 @onready var solo_button: Button = $UILayer/BattleUI/DuoSelectionPopup/VBoxContainer/SoloButton
-@onready var cancel_duo_button: Button = $UILayer/BattleUI/DuoSelectionPopup/VBoxContainer/CancelDuoButton
+#@onready var cancel_duo_button: Button = $UILayer/BattleUI/DuoSelectionPopup/VBoxContainer/CancelDuoButton
+
+
 
 # Labels d'info (panel bas à droite)
 @onready var info_unit_name_label: Label = $UILayer/BattleUI/UnitInfoPanel/MarginContainer/VBoxContainer/UnitNameLabel
@@ -116,6 +118,10 @@ const CAMERA_ANGLE: float = 45.0
 const MOVEMENT_COLOR: Color = Color(0.3, 0.6, 1.0, 0.5)
 const ATTACK_COLOR: Color = Color(1.0, 0.3, 0.3, 0.5)
 
+# Scènes préchargées
+const DUO_ATTACK_OPTION_SCENE = preload("res://scenes/ui/duo_attack_option.tscn")
+const CHARACTER_MINI_CARD_SCENE = preload("res://scenes/ui/character_mini_card.tscn")
+
 # ============================================================================
 # ÉTAT
 # ============================================================================
@@ -136,7 +142,16 @@ var is_camera_rotating: bool = false
 var mouse_ray_length: float = 1000.0
 
 
+@onready var duo_popup: PopupPanel = $UILayer/BattleUI/DuoSelectionPopup
+@onready var support_card_container: PanelContainer = $UILayer/BattleUI/DuoSelectionPopup/MarginContainer/HBoxContainer/SupportMiniCard
+@onready var leader_card_container: PanelContainer = $UILayer/BattleUI/DuoSelectionPopup/MarginContainer/HBoxContainer/LeaderMiniCard
+@onready var duo_options_container: VBoxContainer = $UILayer/BattleUI/DuoSelectionPopup/MarginContainer/HBoxContainer/CenterContainer/DuoOptionsContainer
+@onready var solo_button_duo: Button = $UILayer/BattleUI/DuoSelectionPopup/MarginContainer/HBoxContainer/CenterContainer/ButtonsContainer/SoloButton
+@onready var cancel_duo_button: Button = $UILayer/BattleUI/DuoSelectionPopup/MarginContainer/HBoxContainer/CenterContainer/ButtonsContainer/CancelDuoButton
 
+# Instances des cartes
+var support_mini_card: CharacterMiniCard = null
+var leader_mini_card: CharacterMiniCard = null
 
 # ============================================================================
 # INITIALISATION
@@ -155,6 +170,7 @@ func _ready() -> void:
 	_setup_camera()
 	_connect_ui_buttons()
 	
+	
 	print("[BattleMapManager3D] Initialisé, vérification des données...")
 	
 	await get_tree().process_frame
@@ -166,6 +182,14 @@ func _ready() -> void:
 	else:
 		push_error("[BattleMapManager3D] ❌ Aucune donnée de combat disponible")
 	battle_state_machine.state_changed.connect(_on_battle_state_changed)
+	
+	support_mini_card = CHARACTER_MINI_CARD_SCENE.instantiate()
+	support_card_container.add_child(support_mini_card)
+
+	leader_mini_card = CHARACTER_MINI_CARD_SCENE.instantiate()
+	leader_card_container.add_child(leader_mini_card)
+	
+	
 	if DebugOverlay:
 		DebugOverlay.watch_variable("Tour actuel", self, "current_turn")
 		DebugOverlay.watch_variable("Phase", self, "current_phase")

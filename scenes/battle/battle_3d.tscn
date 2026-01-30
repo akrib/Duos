@@ -249,32 +249,77 @@ layout_mode = 2
 text = "--"
 
 [node name="DuoSelectionPopup" type="PopupPanel" parent="UILayer/BattleUI"]
+size_flags_horizontal = 4
+size_flags_vertical = 4
 
-[node name="VBoxContainer" type="VBoxContainer" parent="UILayer/BattleUI/DuoSelectionPopup"]
+[node name="MarginContainer" type="MarginContainer" parent="UILayer/BattleUI/DuoSelectionPopup"]
 offset_left = 4.0
 offset_top = 4.0
-offset_right = 96.0
-offset_bottom = 96.0
-theme_override_constants/separation = 10
+offset_right = 1000.0
+offset_bottom = 500.0
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 20
 
-[node name="TitleLabel" type="Label" parent="UILayer/BattleUI/DuoSelectionPopup/VBoxContainer"]
+[node name="HBoxContainer" type="HBoxContainer" parent="UILayer/BattleUI/DuoSelectionPopup/MarginContainer"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "Sélectionnez votre partenaire de duo :"
+theme_override_constants/separation = 20
+
+[node name="SupportMiniCard" type="PanelContainer" parent="UILayer/BattleUI/DuoSelectionPopup/MarginContainer/HBoxContainer"]
+custom_minimum_size = Vector2(180, 0)
+layout_mode = 2
+size_flags_vertical = 0
+
+[node name="CenterContainer" type="VBoxContainer" parent="UILayer/BattleUI/DuoSelectionPopup/MarginContainer/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 15
+
+[node name="TitleLabel" type="Label" parent="UILayer/BattleUI/DuoSelectionPopup/MarginContainer/HBoxContainer/CenterContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "⚔️ Formation de Duo ⚔️"
 horizontal_alignment = 1
 
-[node name="UnitsContainer" type="VBoxContainer" parent="UILayer/BattleUI/DuoSelectionPopup/VBoxContainer"]
+[node name="SubtitleLabel" type="Label" parent="UILayer/BattleUI/DuoSelectionPopup/MarginContainer/HBoxContainer/CenterContainer"]
 layout_mode = 2
-theme_override_constants/separation = 5
+theme_override_colors/font_color = Color(0.8, 0.8, 0.8, 1)
+theme_override_font_sizes/font_size = 16
+text = "Choisissez votre combinaison Mana + Arme"
+horizontal_alignment = 1
 
-[node name="SoloButton" type="Button" parent="UILayer/BattleUI/DuoSelectionPopup/VBoxContainer"]
-custom_minimum_size = Vector2(180, 40)
+[node name="HSeparator" type="HSeparator" parent="UILayer/BattleUI/DuoSelectionPopup/MarginContainer/HBoxContainer/CenterContainer"]
 layout_mode = 2
+
+[node name="DuoOptionsContainer" type="VBoxContainer" parent="UILayer/BattleUI/DuoSelectionPopup/MarginContainer/HBoxContainer/CenterContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 10
+
+[node name="HSeparator2" type="HSeparator" parent="UILayer/BattleUI/DuoSelectionPopup/MarginContainer/HBoxContainer/CenterContainer"]
+layout_mode = 2
+
+[node name="ButtonsContainer" type="HBoxContainer" parent="UILayer/BattleUI/DuoSelectionPopup/MarginContainer/HBoxContainer/CenterContainer"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/separation = 10
+
+[node name="SoloButton" type="Button" parent="UILayer/BattleUI/DuoSelectionPopup/MarginContainer/HBoxContainer/CenterContainer/ButtonsContainer"]
+custom_minimum_size = Vector2(200, 50)
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
 text = "🚶 Attaquer Seul"
 
-[node name="CancelDuoButton" type="Button" parent="UILayer/BattleUI/DuoSelectionPopup/VBoxContainer"]
-custom_minimum_size = Vector2(180, 40)
+[node name="CancelDuoButton" type="Button" parent="UILayer/BattleUI/DuoSelectionPopup/MarginContainer/HBoxContainer/CenterContainer/ButtonsContainer"]
+custom_minimum_size = Vector2(200, 50)
 layout_mode = 2
+theme_override_font_sizes/font_size = 18
 text = "✕ Annuler"
+
+[node name="LeaderMiniCard" type="PanelContainer" parent="UILayer/BattleUI/DuoSelectionPopup/MarginContainer/HBoxContainer"]
+custom_minimum_size = Vector2(180, 0)
+layout_mode = 2
+size_flags_vertical = 0
 
 [node name="DialogueBox" parent="UILayer" instance=ExtResource("2_x1cvm")]
