@@ -224,7 +224,15 @@ func _execute_ai_action(unit: BattleUnit3D, decision: Dictionary) -> void:
 				if duo_partner:
 					# ✅ Vérifier seulement l'adjacence cardinale
 					if _is_cardinal_adjacent(unit.grid_position, duo_partner.grid_position):
-						print("[AIModule3D] 💫 Duo IA temporaire : ", unit.unit_name, " + ", duo_partner.unit_name)
+						# ✅ NOUVEAU : Vérifier que le partenaire peut encore agir
+						if duo_partner.can_act():
+							print("[AIModule3D] 💫 Duo IA temporaire : ", unit.unit_name, " + ", duo_partner.unit_name)
+							# ✅ MARQUER LE PARTENAIRE COMME AYANT AGI
+							duo_partner.action_used = true
+							duo_partner.movement_used = true
+						else:
+							# Le partenaire ne peut plus agir, annuler le duo
+							duo_partner = null
 					else:
 						duo_partner = null
 				
@@ -233,7 +241,7 @@ func _execute_ai_action(unit: BattleUnit3D, decision: Dictionary) -> void:
 		
 		"wait":
 			ai_action_taken.emit(unit, "wait")
-
+			
 # ============================================================================
 # UTILITAIRES
 # ============================================================================

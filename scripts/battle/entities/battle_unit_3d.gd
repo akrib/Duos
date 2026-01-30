@@ -848,3 +848,78 @@ func _exit_tree() -> void:
 			tween.kill()
 	
 	GlobalLogger.debug("BATTLE_UNIT", "Unité %s nettoyée" % unit_name)
+
+
+func show_duo_aura(is_enemy_duo: bool = false) -> void:
+	"""Affiche une aura temporaire pour indiquer participation à un duo"""
+	
+	if not sprite_3d:
+		return
+	
+	# Créer un sprite d'aura temporaire
+	var aura = Sprite3D.new()
+	aura.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	aura.texture = _create_aura_texture(is_enemy_duo)
+	aura.pixel_size = 0.05
+	aura.position.y = sprite_height
+	aura.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	aura.modulate.a = 0.0
+	aura.name = "DuoAura"
+	
+	add_child(aura)
+	
+	# Animation de l'aura
+	var tween = aura.create_tween()
+	tween.set_loops()
+	
+	# Fade in
+	tween.tween_property(aura, "modulate:a", 0.8, 0.3)
+	# Pulse
+	tween.tween_property(aura, "scale", Vector3(1.2, 1.2, 1.2), 0.5).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(aura, "scale", Vector3(1.0, 1.0, 1.0), 0.5).set_ease(Tween.EASE_IN_OUT)
+	
+	# Stocker la référence pour suppression
+	set_meta("duo_aura", aura)
+	set_meta("duo_aura_tween", tween)
+
+func hide_duo_aura() -> void:
+	"""Supprime l'aura de duo"""
+	
+	if has_meta("duo_aura"):
+		var aura = get_meta("duo_aura") as Sprite3D
+		
+		if aura and is_instance_valid(aura):
+			var fade_tween = aura.create_tween()
+			fade_tween.tween_property(aura, "modulate:a", 0.0, 0.3)
+			fade_tween.tween_callback(aura.queue_free)
+		
+		remove_meta("duo_aura")
+	
+	if has_meta("duo_aura_tween"):
+		var tween = get_meta("duo_aura_tween") as Tween
+		if tween and tween.is_valid():
+			tween.kill()
+		remove_meta("duo_aura_tween")
+
+func _create_aura_texture(is_enemy: bool) -> ImageTexture:
+	"""Crée une texture d'aura circulaire"""
+	
+	var size = 256
+	var image = Image.create(size, size, false, Image.FORMAT_RGBA8)
+	image.fill(Color.TRANSPARENT)
+	
+	var center = size / 2
+	var color = Color(1.0, 0.2, 0.2, 1.0) if is_enemy else Color(0.2, 0.6, 1.0, 1.0)
+	
+	for y in range(size):
+		for x in range(size):
+			var dx = x - center
+			var dy = y - center
+			var dist = sqrt(dx*dx + dy*dy)
+			
+			# Anneau avec dégradé
+			if dist > center * 0.6 and dist < center:
+				var alpha = 1.0 - (dist - center * 0.6) / (center * 0.4)
+				image.set_pixel(x, y, Color(color.r, color.g, color.b, alpha))
+	
+	return ImageTexture.create_from_image(image)

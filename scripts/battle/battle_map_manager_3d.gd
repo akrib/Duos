@@ -681,15 +681,32 @@ func _handle_unit_click(unit: BattleUnit3D) -> void:
 			_attack_unit(selected_unit, unit)
 
 func _handle_terrain_click(grid_pos: Vector2i) -> void:
-	if not selected_unit or current_action_state != ActionState.SHOWING_MOVE:
+	if not selected_unit:
 		return
 	
-	if movement_module.can_move_to(selected_unit, grid_pos):
-		var cmd = MoveUnitCommand.new(selected_unit, grid_pos, unit_manager)
-		command_history.execute_command(cmd)
-		selected_unit.movement_used = true
-		_close_all_menus()
-		_deselect_unit()
+	if current_action_state == ActionState.SHOWING_MOVE:
+		if movement_module.can_move_to(selected_unit, grid_pos):
+			# Déplacement valide
+			var cmd = MoveUnitCommand.new(selected_unit, grid_pos, unit_manager)
+			command_history.execute_command(cmd)
+			selected_unit.movement_used = true
+			_close_all_menus()
+			_deselect_unit()
+		else:
+			# ✅ NOUVEAU : Clic hors portée de déplacement -> annuler
+			GlobalLogger.debug("BATTLE", "Clic hors portée de déplacement - annulation")
+			_close_all_menus()
+			_deselect_unit()
+	
+	elif current_action_state == ActionState.SHOWING_ATTACK:
+		# ✅ NOUVEAU : Vérifier si la position cliquée est dans la portée d'attaque
+		var attack_positions = action_module.get_attack_positions(selected_unit)
+		
+		if grid_pos not in attack_positions:
+			# Clic hors portée d'attaque -> annuler
+			GlobalLogger.debug("BATTLE", "Clic hors portée d'attaque - annulation")
+			_close_all_menus()
+			_deselect_unit()
 
 # ============================================================================
 # PANEL D'INFORMATION
@@ -903,6 +920,10 @@ func _open_duo_selection_menu() -> void:
 			if ally == selected_unit:
 				continue
 			
+			# ✅ NOUVEAU : Vérifier que l'allié peut encore agir
+			if not ally.can_act():
+				continue
+			
 			if not _is_cardinal_adjacent(selected_unit.grid_position, ally.grid_position):
 				continue
 			
@@ -955,6 +976,7 @@ func _open_duo_selection_menu() -> void:
 	duo_popup.popup()
 	
 	current_action_state = ActionState.CHOOSING_DUO
+
 
 func _setup_duo_popup_transparency() -> void:
 	if not duo_popup.has_theme_stylebox_override("panel"):

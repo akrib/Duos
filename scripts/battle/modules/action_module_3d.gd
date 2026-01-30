@@ -59,6 +59,14 @@ func execute_attack(attacker: BattleUnit3D, target: BattleUnit3D, duo_partner: B
 	
 	if is_duo_attack:
 		print("[ActionModule3D] ⚔️ ATTAQUE EN DUO")
+		
+		# ✅ NOUVEAU : Afficher l'aura sur les deux unités
+		var is_enemy_duo = not attacker.is_player_unit
+		attacker.show_duo_aura(is_enemy_duo)
+		duo_partner.show_duo_aura(is_enemy_duo)
+		
+		# Attendre un peu pour que l'aura soit visible
+		await attacker.get_tree().create_timer(0.5).timeout
 	
 	await _animate_attack_3d(attacker, target)
 	
@@ -75,6 +83,12 @@ func execute_attack(attacker: BattleUnit3D, target: BattleUnit3D, duo_partner: B
 	action_executed.emit(attacker, target, "attack")
 	EventBus.attack(attacker, target, damage)
 	
+	# ✅ NOUVEAU : Retirer les auras après l'attaque
+	if is_duo_attack:
+		await attacker.get_tree().create_timer(0.5).timeout
+		attacker.hide_duo_aura()
+		duo_partner.hide_duo_aura()
+
 # ✅ NOUVELLE FONCTION
 func _spawn_damage_number(target: BattleUnit3D, damage: int) -> void:
 	"""Crée un nombre de dégâts animé au-dessus de la cible"""
