@@ -755,26 +755,14 @@ func _on_move_pressed() -> void:
 	
 	print("[BattleMapManager3D] Mode déplacement activé")
 
-# scenes/battle/battle_map_manager_3d.gd
-# MODIFIER _on_attack_pressed() :
-
 func _on_attack_pressed() -> void:
 	if not selected_unit or not selected_unit.can_act():
 		return
 	
 	action_popup.hide()
 	
-	# Vérifier si l'unité est déjà en duo
-	if duo_system.is_unit_in_duo(selected_unit):
-		var duo_data = duo_system.get_duo_for_unit(selected_unit)
-		duo_partner = duo_data.support if duo_data.leader == selected_unit else duo_data.leader
-		print("[Battle] ✅ Duo existant utilisé")
-		_show_attack_range()
-	else:
-		# Ouvrir le menu de sélection de duo
-		_open_duo_selection_menu()
-
-# MODIFIER _select_duo_partner() :
+	# Ouvrir le menu de sélection de duo
+	_open_duo_selection_menu()
 
 
 func _on_defend_pressed() -> void:
@@ -821,9 +809,6 @@ func _open_duo_selection_menu() -> void:
 		return
 	
 	var allies = unit_manager.get_alive_player_units()
-	var enemies = unit_manager.get_alive_enemy_units()
-	
-	# ✅ Solo uniquement si dernier survivant
 	var is_last_survivor = allies.size() == 1
 	var can_form_duo = allies.size() > 1
 	
@@ -831,31 +816,11 @@ func _open_duo_selection_menu() -> void:
 	for child in duo_options_container.get_children():
 		child.queue_free()
 	
-	# Mettre à jour les DEUX mini-cartes dès le début
+	# Mettre à jour les mini-cartes
 	if leader_mini_card:
 		leader_mini_card.setup_from_unit(selected_unit)
 	
-	# Pré-remplir la carte support avec le premier partenaire disponible
-	if can_form_duo:
-		var first_partner: BattleUnit3D = null
-		
-		for ally in allies:
-			if ally == selected_unit:
-				continue
-			
-			var distance = terrain_module.get_distance(
-				selected_unit.grid_position,
-				ally.grid_position
-			)
-			
-			if distance <= 3:
-				first_partner = ally
-				break
-		
-		if first_partner and support_mini_card:
-			support_mini_card.setup_from_unit(first_partner)
-	
-	# Générer les options de duo
+	# ✅ Chercher uniquement les partenaires ADJACENTS CARDINAUX
 	if can_form_duo:
 		var duo_candidates: Array[BattleUnit3D] = []
 		
@@ -863,27 +828,36 @@ func _open_duo_selection_menu() -> void:
 			if ally == selected_unit:
 				continue
 			
-			var distance = terrain_module.get_distance(
-				selected_unit.grid_position,
-				ally.grid_position
-			)
+			# ✅ Vérifier l'adjacence cardinale stricte
+			if not _is_cardinal_adjacent(selected_unit.grid_position, ally.grid_position):
+				continue
 			
-			if distance <= 3:
-				duo_candidates.append(ally)
+			duo_candidates.append(ally)
 		
-		# Créer les options
+		# Pré-remplir la carte support
+		if not duo_candidates.is_empty() and support_mini_card:
+			support_mini_card.setup_from_unit(duo_candidates[0])
+		
+		# Créer les options de duo
 		for partner in duo_candidates:
-			# Récupérer les vrais anneaux
 			var leader_ring_data = _get_ring_data_from_unit(selected_unit, "mat")
 			var partner_ring_data = _get_ring_data_from_unit(partner, "chan")
 			
 			var duo_option = DUO_ATTACK_OPTION_SCENE.instantiate()
-			
-			# ✅ CORRECTION : Ajouter AVANT d'appeler setup()
 			duo_options_container.add_child(duo_option)
 			
-			# ✅ Maintenant on peut appeler setup() en toute sécurité
-			duo_option.setup(partner_ring_data, leader_ring_data)
+			# ✅ Passer le partenaire à setup()
+			duo_option.setup(partner_ring_data, leader_ring_data, partner)
+			
+			# ✅ Animation bounce au SURVOL
+			duo_option.option_hovered.connect(
+				func(hovered_partner: BattleUnit3D):
+					if support_mini_card:
+						support_mini_card.setup_from_unit(hovered_partner)
+					
+					# Jouer l'animation bounce
+					_play_duo_formation_effect(selected_unit, hovered_partner)
+			)
 			
 			# Connexion : sélection
 			duo_option.option_selected.connect(
@@ -893,17 +867,9 @@ func _open_duo_selection_menu() -> void:
 						"weapon_ring": weapon_id
 					})
 			)
-			
-			# Connexion : survol (met à jour la carte support)
-			duo_option.option_hovered.connect(
-				func():
-					if support_mini_card:
-						support_mini_card.setup_from_unit(partner)
-			)
 	
 	# Bouton solo seulement si dernier survivant
 	solo_button_duo.visible = is_last_survivor
-	
 	if is_last_survivor:
 		solo_button_duo.text = "⚔️ Attaquer (Dernier survivant)"
 	
@@ -913,40 +879,27 @@ func _open_duo_selection_menu() -> void:
 	duo_popup.popup()
 	
 	current_action_state = ActionState.CHOOSING_DUO
-	
-	print("[BattleMap] Menu duo ouvert - Options: ", duo_options_container.get_child_count())
-	
+
 func _on_duo_option_selected(partner: BattleUnit3D, ring_combo: Dictionary) -> void:
 	"""Appelé quand l'utilisateur sélectionne une option Mana + Arme"""
 	
-	# Former le duo
-	var success = duo_system.try_form_duo(selected_unit, partner)
-	
-	if not success:
-		EventBus.notify("Impossible de former ce duo", "error")
+	# ✅ Vérifier seulement l'adjacence (pas de formation persistante)
+	if not _is_cardinal_adjacent(selected_unit.grid_position, partner.grid_position):
+		EventBus.notify("Le partenaire doit être adjacent (N, S, E, O)", "error")
 		return
 	
-	# ✅ NOUVEAU : Effet de bounce sur les deux unités
-	_play_duo_formation_effect(selected_unit, partner)
-	
-	# Stocker les données du duo
+	# Stocker les données du duo TEMPORAIREMENT
 	duo_partner = partner
 	current_attack_profile = ring_combo
 	
-	# Fermer le popup
 	duo_popup.hide()
-	
-	# Afficher la portée d'attaque
 	_show_attack_range()
 	
-	# Notification
 	EventBus.notify(
 		"Duo : %s + %s" % [selected_unit.unit_name, partner.unit_name],
 		"info"
 	)
 	
-	print("[BattleMap] Duo formé avec anneaux : ", ring_combo)
-
 func _play_duo_formation_effect(leader: BattleUnit3D, support: BattleUnit3D) -> void:
 	"""Anime un effet de bounce sur les deux unités du duo"""
 	
@@ -1067,14 +1020,12 @@ func _attack_unit(attacker: BattleUnit3D, target: BattleUnit3D) -> void:
 	
 	current_action_state = ActionState.EXECUTING_ACTION
 	
-	# Si duo, notifier le système
 	if duo_partner:
-		EventBus.form_duo(attacker, duo_partner)
-		print("[BattleMapManager3D] Attaque en duo!")
+		print("[BattleMapManager3D] Attaque en duo temporaire!")
 	
-	await action_module.execute_attack(attacker, target)
+	await action_module.execute_attack(attacker, target, duo_partner)
 	
-	# ✅ CORRECTION : Consommer les actions des DEUX unités
+	# Consommer les actions des DEUX unités
 	attacker.action_used = true
 	attacker.movement_used = true
 	
@@ -1082,11 +1033,12 @@ func _attack_unit(attacker: BattleUnit3D, target: BattleUnit3D) -> void:
 		duo_partner.action_used = true
 		duo_partner.movement_used = true
 		
-		# ✅ Mettre à jour les torus des deux unités
 		attacker.update_torus_state(true)
 		duo_partner.update_torus_state(true)
-		
-		EventBus.break_duo(attacker, duo_partner)
+	
+	# ✅ Réinitialiser le partenaire temporaire
+	duo_partner = null
+	current_attack_profile = {}
 	
 	_close_all_menus()
 	_deselect_unit()
@@ -1322,3 +1274,10 @@ func _get_ring_data_from_unit(unit: BattleUnit3D, ring_type: String) -> Dictiona
 		"ring_name": fallback_names.get(ring_id, ring_id),
 		"icon": ""
 	}
+	
+func _is_cardinal_adjacent(pos_a: Vector2i, pos_b: Vector2i) -> bool:
+	"""Vérifie si deux positions sont adjacentes en cardinal (N, S, E, O uniquement)"""
+	var diff = pos_b - pos_a
+	
+	# Adjacent cardinal = différence de 1 sur UN SEUL axe
+	return (abs(diff.x) == 1 and diff.y == 0) or (abs(diff.y) == 1 and diff.x == 0)

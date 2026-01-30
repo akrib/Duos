@@ -55,36 +55,26 @@ func execute_attack(attacker: BattleUnit3D, target: BattleUnit3D, duo_partner: B
 	if not can_attack(attacker, target):
 		return
 	
-	# Vérifier si c'est une attaque en duo
 	var is_duo_attack = duo_partner != null
 	
 	if is_duo_attack:
-		print("[ActionModule3D] ⚔️ ATTAQUE EN DUO : ", attacker.unit_name, " + ", duo_partner.unit_name)
-		
-		# TODO Phase 3: Générer AttackProfile depuis les rings équipés
-		# var mat_ring_id = ring_system.get_unit_rings(attacker.unit_id).get("mat", "mat_basic_line")
-		# var chan_ring_id = ring_system.get_unit_rings(duo_partner.unit_id).get("chan", "chan_fire")
-		# var attack_profile = ring_system.generate_attack_profile(mat_ring_id, chan_ring_id)
-	else:
-		print("[ActionModule3D] ⚔️ Attaque solo : ", attacker.unit_name)
+		print("[ActionModule3D] ⚔️ ATTAQUE EN DUO")
 	
 	await _animate_attack_3d(attacker, target)
 	
 	var damage = calculate_damage(attacker, target)
 	
-	# Bonus de duo (simple pour l'instant)
+	# Bonus de duo
 	if is_duo_attack:
 		damage = int(damage * 1.5)
-		print("[ActionModule3D] 💥 Bonus de duo appliqué!")
 	
 	target.take_damage(damage)
 	_spawn_damage_number(target, damage)
 	
 	damage_dealt.emit(target, damage)
 	action_executed.emit(attacker, target, "attack")
-	
 	EventBus.attack(attacker, target, damage)
-
+	
 # ✅ NOUVELLE FONCTION
 func _spawn_damage_number(target: BattleUnit3D, damage: int) -> void:
 	"""Crée un nombre de dégâts animé au-dessus de la cible"""

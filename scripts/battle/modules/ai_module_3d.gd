@@ -98,17 +98,8 @@ func evaluate_unit_action(unit: BattleUnit3D) -> Dictionary:
 	
 	return best_decision
 
-# ✅ NOUVELLE FONCTION : Trouver le meilleur partenaire de duo
 func find_best_duo_partner(unit: BattleUnit3D) -> BattleUnit3D:
 	"""Trouve le meilleur partenaire de duo pour une unité ennemie"""
-	
-	if not duo_system:
-		return null
-	
-	# Si déjà en duo, utiliser le partenaire actuel
-	if duo_system.is_unit_in_duo(unit):
-		var duo_data = duo_system.get_duo_for_unit(unit)
-		return duo_data.support if duo_data.leader == unit else duo_data.leader
 	
 	var enemies = unit_manager.get_alive_enemy_units()
 	var best_partner: BattleUnit3D = null
@@ -118,16 +109,10 @@ func find_best_duo_partner(unit: BattleUnit3D) -> BattleUnit3D:
 		if ally == unit:
 			continue
 		
-		# Vérifier si peut former un duo
-		if duo_system.is_unit_in_duo(ally):
+		# ✅ Vérifier l'adjacence cardinale stricte
+		if not _is_cardinal_adjacent(unit.grid_position, ally.grid_position):
 			continue
 		
-		# Vérifier l'adjacence
-		var distance = terrain.get_distance(unit.grid_position, ally.grid_position)
-		if distance > 1:  # Doit être adjacent
-			continue
-		
-		# Calculer un score de synégie
 		var score = _evaluate_duo_synergy(unit, ally)
 		
 		if score > best_score:
@@ -135,7 +120,7 @@ func find_best_duo_partner(unit: BattleUnit3D) -> BattleUnit3D:
 			best_partner = ally
 	
 	return best_partner
-
+	
 func _evaluate_duo_synergy(unit_a: BattleUnit3D, unit_b: BattleUnit3D) -> float:
 	"""Évalue la synergie d'un duo potentiel"""
 	
@@ -233,23 +218,18 @@ func _execute_ai_action(unit: BattleUnit3D, decision: Dictionary) -> void:
 	match decision.get("action", "wait"):
 		"attack":
 			var target = decision.get("target")
-			var duo_partner = decision.get("duo_partner")  # ✅ NOUVEAU
+			var duo_partner = decision.get("duo_partner")
 			
 			if target and action_module.can_attack(unit, target):
-				# ✅ NOUVEAU : Former le duo si partenaire disponible
-				if duo_partner and duo_system:
-					var duo_formed = duo_system.try_form_duo(unit, duo_partner)
-					if duo_formed:
-						print("[AIModule3D] 💫 Duo IA formé : ", unit.unit_name, " + ", duo_partner.unit_name)
+				if duo_partner:
+					# ✅ Vérifier seulement l'adjacence cardinale
+					if _is_cardinal_adjacent(unit.grid_position, duo_partner.grid_position):
+						print("[AIModule3D] 💫 Duo IA temporaire : ", unit.unit_name, " + ", duo_partner.unit_name)
+					else:
+						duo_partner = null
 				
-				# Attaquer avec ou sans duo
 				await action_module.execute_attack(unit, target, duo_partner)
 				ai_action_taken.emit(unit, "attack")
-				
-				# ✅ NOUVEAU : Rompre le duo après l'attaque
-				if duo_partner and duo_system and duo_system.is_unit_in_duo(unit):
-					var duo_data = duo_system.get_duo_for_unit(unit)
-					duo_system.break_duo(duo_data.duo_id)
 		
 		"wait":
 			ai_action_taken.emit(unit, "wait")
@@ -278,3 +258,9 @@ func _min_distance_to_players(unit: BattleUnit3D, players: Array) -> int:
 			min_dist = dist
 	
 	return min_dist
+
+
+func _is_cardinal_adjacent(pos_a: Vector2i, pos_b: Vector2i) -> bool:
+	"""Vérifie si deux positions sont adjacentes en cardinal"""
+	var diff = pos_b - pos_a
+	return (abs(diff.x) == 1 and diff.y == 0) or (abs(diff.y) == 1 and diff.x == 0)
