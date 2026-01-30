@@ -41,5 +41,11 @@
 		"attack": "res://animations/enemies/goblin_attack.tres",
 		"hit": "res://animations/enemies/goblin_hit.tres",
 		"death": "res://animations/enemies/goblin_death.tres"
-	}
+	},
+	"sprite_path": "res://asset/unit/unit.png",
+	"sprite_frame": 3,
+	"sprite_hframes": 7,
+	"sprite_vframes": 3,
+	"materialization_ring": "mat_basic_line",
+	"channeling_ring": "chan_neutral"
 }

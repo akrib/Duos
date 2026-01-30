@@ -1,6 +1,6 @@
 extends Node3D
 ## BattleUnit3D - Unité de combat avec sprite billboard
-## Version corrigée : cercle horizontal, team indicator enfant de HP bar, barre de vie verte
+## ✅ VERSION MISE À JOUR : Support des sprites externes (unit.tscn) avec fallback
 
 class_name BattleUnit3D
 
@@ -72,16 +72,28 @@ var status_effects: Dictionary = {}
 var unit_color: Color = Color.BLUE
 var is_selected: bool = false
 var current_torus_state: TorusState = TorusState.CAN_ACT_AND_MOVE
+
+# ✅ NOUVEAU : Sprite externe
+var sprite_path: String = "res://asset/unit/unit.png"  # Chemin vers le sprite
+var sprite_frame: int = 20  # Frame du sprite à afficher (défaut)
+var sprite_hframes: int = 7  # Nombre de frames horizontales
+var sprite_vframes: int = 3  # Nombre de frames verticales
+
+# ✅ NOUVEAU : Anneaux équipés (valeurs par défaut)
+var equipped_materialization_ring: String = "mat_basic_line"  # Anneau d'arme par défaut
+var equipped_channeling_ring: String = "chan_neutral"  # Anneau de mana par défaut (sans effet)
+
 # Visuels 3D
 var sprite_3d: Sprite3D
 var hp_bar_container: Node3D  # Container pour billboard
 var hp_bar_3d: MeshInstance3D
 var hp_bar_bg: MeshInstance3D
-var team_indicator: MeshInstance3D  # ← Maintenant enfant de hp_bar_container
+var team_indicator: MeshInstance3D
 var selection_indicator: MeshInstance3D
 var shadow_sprite: Sprite3D
 var level: int = 1
 var xp: int = 0
+
 # ============================================================================
 # INITIALISATION
 # ============================================================================
@@ -109,10 +121,13 @@ func _create_visuals_3d() -> void:
 	# 2. SPRITE PRINCIPAL (Billboard)
 	sprite_3d = Sprite3D.new()
 	sprite_3d.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	sprite_3d.texture = _create_unit_texture()
 	sprite_3d.pixel_size = 0.01
 	sprite_3d.position.y = sprite_height
 	sprite_3d.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	
+	# ✅ NOUVEAU : Charger le sprite externe ou fallback
+	_load_sprite_texture()
+	
 	add_child(sprite_3d)
 	
 	# 3. INDICATEUR DE SÉLECTION (anneau au sol - HORIZONTAL)
@@ -137,8 +152,33 @@ func _create_visuals_3d() -> void:
 	
 	print("[BattleUnit3D] 👁️ Visuals created for ", unit_name)
 
+# ✅ NOUVELLE FONCTION : Charger le sprite externe ou fallback
+func _load_sprite_texture() -> void:
+	"""Charge le sprite depuis unit.tscn ou utilise le fallback"""
+	
+	# Tentative de chargement du sprite externe
+	if sprite_path != "" and ResourceLoader.exists(sprite_path):
+		var external_texture = load(sprite_path) as Texture2D
+		
+		if external_texture:
+			sprite_3d.texture = external_texture
+			sprite_3d.hframes = sprite_hframes
+			sprite_3d.vframes = sprite_vframes
+			sprite_3d.frame = sprite_frame
+			
+			print("[BattleUnit3D] ✅ Sprite externe chargé : ", sprite_path, " (frame ", sprite_frame, ")")
+			return
+	
+	# Fallback : créer un cercle de couleur
+	sprite_3d.texture = _create_unit_texture()
+	sprite_3d.hframes = 1
+	sprite_3d.vframes = 1
+	sprite_3d.frame = 0
+	
+	print("[BattleUnit3D] ⚠️ Sprite fallback utilisé pour ", unit_name)
+
 func _create_unit_texture() -> ImageTexture:
-	"""Crée une texture simple pour le sprite de l'unité"""
+	"""Crée une texture simple pour le sprite de l'unité (FALLBACK)"""
 	var image = Image.create(128, 128, false, Image.FORMAT_RGBA8)
 	image.fill(Color.TRANSPARENT)
 	
@@ -198,7 +238,6 @@ func _create_selection_ring() -> MeshInstance3D:
 	mesh_instance.set_surface_override_material(0, material)
 	mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	
-	# ✅ TOUJOURS VISIBLE
 	mesh_instance.visible = true
 	
 	return mesh_instance
@@ -252,8 +291,6 @@ func set_selected(selected: bool) -> void:
 	update_torus_state(true)  # Force update
 	selected_changed.emit(selected)
 
-
-
 func _create_hp_bar_with_team_indicator() -> void:
 	"""Crée une barre de HP avec team indicator comme enfant"""
 	
@@ -273,7 +310,7 @@ func _create_hp_bar_with_team_indicator() -> void:
 	bg_material.albedo_color = Color(0.2, 0.2, 0.2)
 	bg_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	bg_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	bg_material.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED  # ✅ AJOUTÉ
+	bg_material.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
 	hp_bar_bg.set_surface_override_material(0, bg_material)
 	hp_bar_bg.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	hp_bar_container.add_child(hp_bar_bg)
@@ -281,32 +318,29 @@ func _create_hp_bar_with_team_indicator() -> void:
 	# ========== BARRE DE HP AVANT-PLAN (verte) ==========
 	hp_bar_3d = MeshInstance3D.new()
 	var box = BoxMesh.new()
-	box.size = Vector3(tile_size * 0.8, 0.06, 0.04)  # ✅ Plus épais en Z
+	box.size = Vector3(tile_size * 0.8, 0.06, 0.04)
 	hp_bar_3d.mesh = box
 	
-	# ✅ CORRECTION : Position devant le fond
 	hp_bar_3d.position.z = 0.03  # Devant le fond
 	
-	# ✅ CORRECTION : Material vert avec rendering_mode approprié
 	var material = StandardMaterial3D.new()
 	material.albedo_color = Color.GREEN
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED  # ✅ AJOUTÉ
+	material.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
 	material.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
-	material.no_depth_test = false  # ✅ AJOUTÉ
+	material.no_depth_test = false
 	hp_bar_3d.set_surface_override_material(0, material)
 	hp_bar_3d.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	
-	# ✅ CRITIQUE : Render priority pour garantir l'ordre
-	hp_bar_3d.sorting_offset = 0.1  # ✅ AJOUTÉ : Priorité de rendu
+	hp_bar_3d.sorting_offset = 0.1
 	
 	hp_bar_container.add_child(hp_bar_3d)
 	
 	# ========== TEAM INDICATOR ==========
 	team_indicator = MeshInstance3D.new()
 	var indicator_box = BoxMesh.new()
-	indicator_box.size = Vector3(0.12, 0.12, 0.04)  # ✅ Plus épais
+	indicator_box.size = Vector3(0.12, 0.12, 0.04)
 	team_indicator.mesh = indicator_box
 	
 	var bar_width = tile_size * 0.8
@@ -314,7 +348,7 @@ func _create_hp_bar_with_team_indicator() -> void:
 	team_indicator.position = Vector3(
 		bar_width / 2 + 0.08,
 		-bar_height / 2,
-		0.03  # ✅ Même Z que la barre verte
+		0.03
 	)
 	
 	var team_material = StandardMaterial3D.new()
@@ -323,7 +357,7 @@ func _create_hp_bar_with_team_indicator() -> void:
 	team_material.emission_enabled = true
 	team_material.emission = team_material.albedo_color * 0.5
 	team_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	team_material.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED  # ✅ AJOUTÉ
+	team_material.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
 	team_indicator.set_surface_override_material(0, team_material)
 	team_indicator.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	
@@ -335,9 +369,7 @@ func _process(_delta: float) -> void:
 	if not camera:
 		return
 	
-	# ✅ CORRECTION : Copier la rotation de la caméra au lieu de look_at
 	if hp_bar_container:
-		# Billboard pur : copier la rotation globale de la caméra
 		var cam_basis = camera.global_transform.basis
 		hp_bar_container.global_transform.basis = cam_basis
 
@@ -452,7 +484,6 @@ func remove_status_effect(effect_name: String) -> void:
 func has_status_effect(effect_name: String) -> bool:
 	return status_effects.has(effect_name)
 
-
 # ============================================================================
 # VISUELS & ANIMATIONS 3D
 # ============================================================================
@@ -462,29 +493,24 @@ func _update_hp_bar() -> void:
 	if not hp_bar_3d or not hp_bar_3d.mesh:
 		return
 	
-	# ✅ CORRECTION : Vérifier que max_hp > 0 pour éviter division par zéro
 	if max_hp <= 0:
 		push_warning("[BattleUnit3D] max_hp invalide pour ", unit_name)
 		return
 	
 	var hp_percent = get_hp_percentage()
 	
-	# ✅ CORRECTION : S'assurer que tile_size est valide
 	var bar_max_width = tile_size * 0.8
 	if bar_max_width <= 0:
-		bar_max_width = 0.8  # Fallback
+		bar_max_width = 0.8
 	
-	# Redimensionner correctement
 	var box_mesh = hp_bar_3d.mesh as BoxMesh
 	if box_mesh:
 		var current_width = bar_max_width * hp_percent
 		box_mesh.size.x = current_width
 		
-		# Ancrer à gauche
 		var offset = (bar_max_width - current_width) / 2.0
 		hp_bar_3d.position.x = -offset
 	
-	# Changer la couleur selon le % de HP
 	var material = hp_bar_3d.get_surface_override_material(0) as StandardMaterial3D
 	if material:
 		if hp_percent > 0.6:
@@ -574,9 +600,8 @@ func initialize_unit(data: Dictionary) -> void:
 	if data.has("position"):
 		grid_position = data.position
 	
-	# ✅ CORRECTION : Initialiser les stats dans le bon ordre
-	var temp_max_hp = 100  # Valeur par défaut
-	var temp_current_hp = -1  # Sentinelle pour savoir si explicitement défini
+	var temp_max_hp = 100
+	var temp_current_hp = -1
 	
 	# Stats depuis le bloc "stats"
 	if data.has("stats"):
@@ -599,20 +624,15 @@ func initialize_unit(data: Dictionary) -> void:
 	if data.has("hp"):
 		temp_current_hp = data.hp
 	
-	# ✅ CORRECTION : Appliquer les HP de façon cohérente
 	max_hp = temp_max_hp
 	
 	if temp_current_hp >= 0:
-		# HP explicitement défini dans les données
 		current_hp = temp_current_hp
 	else:
-		# Pas de HP spécifié → commencer au maximum
 		current_hp = max_hp
 	
-	# Sécurité : s'assurer que current_hp ne dépasse jamais max_hp
 	current_hp = min(current_hp, max_hp)
 	
-	# Stats directes restantes
 	if data.has("attack"):
 		attack_power = data.attack
 	if data.has("defense"):
@@ -639,26 +659,43 @@ func initialize_unit(data: Dictionary) -> void:
 			for effect_name in effects:
 				status_effects[effect_name] = effects[effect_name]
 	
+	# ✅ NOUVEAU : Sprite personnalisé
+	if data.has("sprite_path"):
+		sprite_path = data.sprite_path
+	
+	if data.has("sprite_frame"):
+		sprite_frame = data.sprite_frame
+	
+	if data.has("sprite_hframes"):
+		sprite_hframes = data.sprite_hframes
+	
+	if data.has("sprite_vframes"):
+		sprite_vframes = data.sprite_vframes
+	
+	# ✅ NOUVEAU : Anneaux équipés
+	if data.has("materialization_ring"):
+		equipped_materialization_ring = data.materialization_ring
+	
+	if data.has("channeling_ring"):
+		equipped_channeling_ring = data.channeling_ring
+	
 	# Apparence
 	if data.has("color"):
 		unit_color = data.color
 	else:
-		# Couleur par défaut selon l'équipe
 		unit_color = Color(0.2, 0.2, 0.8) if is_player_unit else Color(0.8, 0.2, 0.2)
 	
 	level = data.get("level", 1)
 	xp = data.get("xp", 0)
 	
-	# ✅ CORRECTION : Log de debug pour vérifier les HP
 	print("[BattleUnit3D] Unité initialisée: ", unit_name, " (", unit_id, ")")
 	print("  → HP: ", current_hp, "/", max_hp, " (", get_hp_percentage() * 100, "%)")
-
+	print("  → Anneaux: ", equipped_materialization_ring, " + ", equipped_channeling_ring)
 
 func award_xp(amount: int) -> void:
 	if not is_player_unit:
-		return  # Seuls les joueurs gagnent XP
+		return
 	
 	xp += amount
 	print("[", unit_name, "] +", amount, " XP (Total: ", xp, ")")
-	# Notifier TeamManager
 	TeamManager.add_xp(unit_id, amount)

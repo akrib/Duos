@@ -21,6 +21,13 @@
         "speed": 5,
         "range": 1
       },
+      "sprite_path": "res://asset/unit/unit.png",
+      "sprite_frame": 1,
+      "sprite_hframes": 7,
+      "sprite_vframes": 3,
+      
+      "materialization_ring": "mat_basic_line",
+      "channeling_ring": "chan_poison",
       "abilities": ["slash", "charge"]
     },
     {
@@ -36,6 +43,13 @@
         "speed": 4,
         "range": 3
       },
+      "sprite_path": "res://asset/unit/unit.png",
+      "sprite_frame": 2,
+      "sprite_hframes": 7,
+      "sprite_vframes": 3,
+      
+      "materialization_ring": "mat_basic_line",
+      "channeling_ring": "chan_poison",
       "abilities": ["fireball", "heal"]
     },
     {
@@ -51,6 +65,13 @@
         "speed": 6,
         "range": 4
       },
+      "sprite_path": "res://asset/unit/unit.png",
+      "sprite_frame": 3,
+      "sprite_hframes": 7,
+      "sprite_vframes": 3,
+      
+      "materialization_ring": "mat_basic_line",
+      "channeling_ring": "chan_poison",
       "abilities": ["precise_shot", "multishot"]
     }
   ],
@@ -68,6 +89,13 @@
         "speed": 5,
         "range": 3
       },
+      "sprite_path": "res://asset/unit/unit.png",
+      "sprite_frame": 13,
+      "sprite_hframes": 7,
+      "sprite_vframes": 3,
+      
+      "materialization_ring": "mat_basic_line",
+      "channeling_ring": "chan_poison",
       "abilities": ["poison_arrow"]
     },
     {
@@ -83,6 +111,13 @@
         "speed": 7,
         "range": 1
       },
+      "sprite_path": "res://asset/unit/unit.png",
+      "sprite_frame": 12,
+      "sprite_hframes": 7,
+      "sprite_vframes": 3,
+      
+      "materialization_ring": "mat_basic_line",
+      "channeling_ring": "chan_poison",
       "abilities": ["bite", "howl"]
     },
     {
@@ -98,6 +133,13 @@
         "speed": 3,
         "range": 2
       },
+      "sprite_path": "res://asset/unit/unit.png",
+      "sprite_frame": 11,
+      "sprite_hframes": 7,
+      "sprite_vframes": 3,
+      
+      "materialization_ring": "mat_basic_line",
+      "channeling_ring": "chan_poison",
       "abilities": ["dark_bolt", "curse"]
     }
   ],

@@ -1,5 +1,6 @@
 extends Node
 ## AIModule3D - Intelligence artificielle pour les ennemis (version 3D)
+## ✅ VERSION MISE À JOUR : Support des attaques en duo
 
 class_name AIModule3D
 
@@ -11,6 +12,9 @@ var terrain: TerrainModule3D
 var unit_manager: UnitManager3D
 var movement_module: MovementModule3D
 var action_module: ActionModule3D
+
+# ✅ NOUVEAU : Référence au DuoSystem
+var duo_system: DuoSystem
 
 enum AIBehavior {
 	AGGRESSIVE,
@@ -71,10 +75,14 @@ func evaluate_unit_action(unit: BattleUnit3D) -> Dictionary:
 		var move_pos = find_best_movement(unit)
 		return {"action": "wait", "move_to": move_pos, "score": 10.0}
 	
+	# ✅ NOUVEAU : Vérifier si on peut attaquer en duo
+	var duo_partner = find_best_duo_partner(unit)
+	
 	if action_module.can_attack(unit, target):
 		best_decision = {
 			"action": "attack",
 			"target": target,
+			"duo_partner": duo_partner,  # ✅ NOUVEAU
 			"score": 100.0
 		}
 	else:
@@ -83,11 +91,68 @@ func evaluate_unit_action(unit: BattleUnit3D) -> Dictionary:
 			best_decision = {
 				"action": "attack",
 				"target": target,
+				"duo_partner": duo_partner,  # ✅ NOUVEAU
 				"move_to": move_pos,
 				"score": 80.0
 			}
 	
 	return best_decision
+
+# ✅ NOUVELLE FONCTION : Trouver le meilleur partenaire de duo
+func find_best_duo_partner(unit: BattleUnit3D) -> BattleUnit3D:
+	"""Trouve le meilleur partenaire de duo pour une unité ennemie"""
+	
+	if not duo_system:
+		return null
+	
+	# Si déjà en duo, utiliser le partenaire actuel
+	if duo_system.is_unit_in_duo(unit):
+		var duo_data = duo_system.get_duo_for_unit(unit)
+		return duo_data.support if duo_data.leader == unit else duo_data.leader
+	
+	var enemies = unit_manager.get_alive_enemy_units()
+	var best_partner: BattleUnit3D = null
+	var best_score: float = -INF
+	
+	for ally in enemies:
+		if ally == unit:
+			continue
+		
+		# Vérifier si peut former un duo
+		if duo_system.is_unit_in_duo(ally):
+			continue
+		
+		# Vérifier l'adjacence
+		var distance = terrain.get_distance(unit.grid_position, ally.grid_position)
+		if distance > 1:  # Doit être adjacent
+			continue
+		
+		# Calculer un score de synégie
+		var score = _evaluate_duo_synergy(unit, ally)
+		
+		if score > best_score:
+			best_score = score
+			best_partner = ally
+	
+	return best_partner
+
+func _evaluate_duo_synergy(unit_a: BattleUnit3D, unit_b: BattleUnit3D) -> float:
+	"""Évalue la synergie d'un duo potentiel"""
+	
+	var score = 0.0
+	
+	# Préférer les unités avec haute attaque + support
+	if unit_a.attack_power > unit_b.attack_power:
+		score += 10.0
+	
+	# Bonus si les deux unités ont des HP élevés
+	score += (unit_a.get_hp_percentage() + unit_b.get_hp_percentage()) * 5.0
+	
+	# Bonus pour diversité de stats
+	var stat_diff = abs(unit_a.attack_power - unit_b.defense_power)
+	score += stat_diff * 0.5
+	
+	return score
 
 func find_best_attack_target(unit: BattleUnit3D) -> BattleUnit3D:
 	var player_units = unit_manager.get_alive_player_units()
@@ -168,9 +233,23 @@ func _execute_ai_action(unit: BattleUnit3D, decision: Dictionary) -> void:
 	match decision.get("action", "wait"):
 		"attack":
 			var target = decision.get("target")
+			var duo_partner = decision.get("duo_partner")  # ✅ NOUVEAU
+			
 			if target and action_module.can_attack(unit, target):
-				await action_module.execute_attack(unit, target)
+				# ✅ NOUVEAU : Former le duo si partenaire disponible
+				if duo_partner and duo_system:
+					var duo_formed = duo_system.try_form_duo(unit, duo_partner)
+					if duo_formed:
+						print("[AIModule3D] 💫 Duo IA formé : ", unit.unit_name, " + ", duo_partner.unit_name)
+				
+				# Attaquer avec ou sans duo
+				await action_module.execute_attack(unit, target, duo_partner)
 				ai_action_taken.emit(unit, "attack")
+				
+				# ✅ NOUVEAU : Rompre le duo après l'attaque
+				if duo_partner and duo_system and duo_system.is_unit_in_duo(unit):
+					var duo_data = duo_system.get_duo_for_unit(unit)
+					duo_system.break_duo(duo_data.duo_id)
 		
 		"wait":
 			ai_action_taken.emit(unit, "wait")

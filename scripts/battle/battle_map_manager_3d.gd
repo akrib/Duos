@@ -286,6 +286,7 @@ func _initialize_modules() -> void:
 	ai_module.unit_manager = unit_manager
 	ai_module.movement_module = movement_module
 	ai_module.action_module = action_module
+	ai_module.duo_system = duo_system
 	add_child(ai_module)
 	
 	
