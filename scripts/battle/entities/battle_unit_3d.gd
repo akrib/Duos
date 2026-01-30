@@ -1,8 +1,12 @@
 extends Node3D
 ## BattleUnit3D - Unité de combat avec sprite billboard
-## ✅ VERSION MISE À JOUR : Support des sprites externes (unit.tscn) avec fallback
+## ✅ VERSION OPTIMISÉE : Respiration dynamique + GlobalLogger
 
 class_name BattleUnit3D
+
+# ============================================================================
+# ENUMS
+# ============================================================================
 
 enum TorusState {
 	CAN_ACT_AND_MOVE,   # Vert
@@ -14,7 +18,7 @@ enum TorusState {
 }
 
 # ============================================================================
-# SIGNAUX (identiques à la version 2D)
+# SIGNAUX
 # ============================================================================
 
 signal died()
@@ -24,24 +28,49 @@ signal status_effect_applied(effect_name: String)
 signal status_effect_removed(effect_name: String)
 
 # ============================================================================
-# CONFIGURATION
+# CONFIGURATION VISUELLE
 # ============================================================================
 
-var tile_size: float = 1.0
-var sprite_height: float = 0.2  # Hauteur du sprite au-dessus du sol
+const TILE_SIZE_DEFAULT: float = 1.0
+const SPRITE_HEIGHT_DEFAULT: float = 0.2
+const SHADOW_OPACITY: float = 0.3
+const HP_BAR_WIDTH_RATIO: float = 0.8
+const HP_BAR_HEIGHT_OFFSET: float = 0.6
+
+# Couleurs du torus
+const TORUS_COLORS: Dictionary = {
+	TorusState.CAN_ACT_AND_MOVE: Color.GREEN,
+	TorusState.CAN_ACT_ONLY: Color.YELLOW,
+	TorusState.CAN_MOVE_ONLY: Color.CYAN,
+	TorusState.CANNOT_ACT: Color.GRAY,
+	TorusState.SELECTED: Color.RED,
+	TorusState.ENEMY_TURN: Color.GRAY
+}
+
+# Respiration
+const BREATH_INTENSITY: float = 0.05  # ±10%
+const BREATH_DURATION_MIN: float = 2.5
+const BREATH_DURATION_MAX: float = 3.5
+const BREATH_DELAY_MAX: float = 2.0
+
+# Vitesse de respiration selon HP
+const BREATH_SPEED_HEALTHY: float = 1.0    # HP > 60%
+const BREATH_SPEED_WOUNDED: float = 1.5    # HP 30-60%
+const BREATH_SPEED_CRITICAL: float = 2.5   # HP < 30%
 
 # ============================================================================
-# IDENTITÉ
+# PROPRIÉTÉS
 # ============================================================================
 
+var tile_size: float = TILE_SIZE_DEFAULT
+var sprite_height: float = SPRITE_HEIGHT_DEFAULT
+
+# Identité
 var unit_name: String = "Unit"
 var is_player_unit: bool = false
 var unit_id: String = ""
 
-# ============================================================================
-# STATS (identiques)
-# ============================================================================
-
+# Stats
 var max_hp: int = 100
 var current_hp: int = 100
 var attack_power: int = 20
@@ -49,50 +78,50 @@ var defense_power: int = 10
 var movement_range: int = 5
 var attack_range: int = 1
 
-# ============================================================================
-# ÉTAT
-# ============================================================================
-
+# État
 var movement_used: bool = false
 var action_used: bool = false
 var has_acted_this_turn: bool = false
 var grid_position: Vector2i = Vector2i(0, 0)
 
-# ============================================================================
-# CAPACITÉS & EFFETS
-# ============================================================================
-
+# Capacités & Effets
 var abilities: Array[String] = []
 var status_effects: Dictionary = {}
 
-# ============================================================================
-# APPARENCE
-# ============================================================================
-
+# Apparence
 var unit_color: Color = Color.BLUE
 var is_selected: bool = false
 var current_torus_state: TorusState = TorusState.CAN_ACT_AND_MOVE
 
-# ✅ NOUVEAU : Sprite externe
-var sprite_path: String = "res://asset/unit/unit.png"  # Chemin vers le sprite
-var sprite_frame: int = 20  # Frame du sprite à afficher (défaut)
-var sprite_hframes: int = 7  # Nombre de frames horizontales
-var sprite_vframes: int = 3  # Nombre de frames verticales
+# Sprite externe
+var sprite_path: String = "res://asset/unit/unit.png"
+var sprite_frame: int = 20
+var sprite_hframes: int = 7
+var sprite_vframes: int = 3
 
-# ✅ NOUVEAU : Anneaux équipés (valeurs par défaut)
-var equipped_materialization_ring: String = "mat_basic_line"  # Anneau d'arme par défaut
-var equipped_channeling_ring: String = "chan_neutral"  # Anneau de mana par défaut (sans effet)
+# Anneaux équipés
+var equipped_materialization_ring: String = "mat_basic_line"
+var equipped_channeling_ring: String = "chan_neutral"
 
-# Visuels 3D
+# Progression
+var level: int = 1
+var xp: int = 0
+
+# ============================================================================
+# RÉFÉRENCES VISUELLES 3D
+# ============================================================================
+
 var sprite_3d: Sprite3D
-var hp_bar_container: Node3D  # Container pour billboard
+var hp_bar_container: Node3D
 var hp_bar_3d: MeshInstance3D
 var hp_bar_bg: MeshInstance3D
 var team_indicator: MeshInstance3D
 var selection_indicator: MeshInstance3D
 var shadow_sprite: Sprite3D
-var level: int = 1
-var xp: int = 0
+
+# Cache de materials (optimisation)
+var torus_material: StandardMaterial3D
+var hp_bar_material: StandardMaterial3D
 
 # ============================================================================
 # INITIALISATION
@@ -104,16 +133,22 @@ func _ready() -> void:
 	
 	_create_visuals_3d()
 	_update_hp_bar()
+	
+	GlobalLogger.debug("BATTLE_UNIT", "Unité %s initialisée (ID: %s)" % [unit_name, unit_id])
+
+# ============================================================================
+# CRÉATION DES VISUELS 3D
+# ============================================================================
 
 func _create_visuals_3d() -> void:
 	"""Crée tous les éléments visuels 3D de l'unité"""
 	
-	# 1. OMBRE AU SOL (Sprite3D horizontal)
+	# 1. OMBRE AU SOL
 	shadow_sprite = Sprite3D.new()
 	shadow_sprite.billboard = BaseMaterial3D.BILLBOARD_DISABLED
-	shadow_sprite.texture = _create_circle_texture(64, Color(0, 0, 0, 0.3))
+	shadow_sprite.texture = _create_circle_texture(64, Color(0, 0, 0, SHADOW_OPACITY))
 	shadow_sprite.pixel_size = 0.02
-	shadow_sprite.rotation.x = -PI / 2  # Horizontal au sol
+	shadow_sprite.rotation.x = -PI / 2
 	shadow_sprite.position.y = 0.05
 	shadow_sprite.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(shadow_sprite)
@@ -124,76 +159,32 @@ func _create_visuals_3d() -> void:
 	sprite_3d.pixel_size = 0.04
 	sprite_3d.position.y = sprite_height
 	sprite_3d.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	
-	# ✅ NOUVEAU : Charger le sprite externe ou fallback
 	_load_sprite_texture()
-	
 	add_child(sprite_3d)
 	
-	# 3. INDICATEUR DE SÉLECTION (anneau au sol - HORIZONTAL)
+	# 3. INDICATEUR DE SÉLECTION (torus)
 	selection_indicator = _create_selection_ring()
-	selection_indicator.visible = false
+	selection_indicator.visible = true
 	add_child(selection_indicator)
 	
-	# 4. BARRE DE HP avec TEAM INDICATOR (au-dessus du sprite - BILLBOARD)
+	# 4. BARRE DE HP + TEAM INDICATOR
 	_create_hp_bar_with_team_indicator()
 	
-	# 5. COLLISION POUR LE RAYCASTING
+	# 5. COLLISION RAYCASTING
 	_create_collision()
 	
-	# Forcer la visibilité
+	# Forcer visibilité
 	visible = true
 	show()
 	
-	for child in get_children():
-		if child is VisualInstance3D:
-			child.visible = true
-			child.show()
+	# 6. DÉMARRER RESPIRATION
 	_start_breathing_animation()
-	print("[BattleUnit3D] 👁️ Visuals created for ", unit_name)
+	
+	GlobalLogger.debug("BATTLE_UNIT", "Visuels créés pour %s" % unit_name)
 
-
-func _start_breathing_animation() -> void:
-	"""Démarre une animation de respiration fluide et désynchronisée"""
-	
-	if not sprite_3d:
-		return
-	
-	# Attendre un délai aléatoire pour désynchroniser (0.0 à 2.0 secondes)
-	await get_tree().create_timer(randf_range(0.0, 2.0)).timeout
-	
-	# Paramètres de respiration
-	var breath_duration = randf_range(2.5, 3.5)  # Durée variable (2.5s à 3.5s)
-	var scale_min = 0.9  # -10%
-	var scale_max = 1.1  # +10%
-	
-	# Créer le tween en boucle
-	var tween = sprite_3d.create_tween()
-	tween.set_loops()
-	
-	# Inspiration : scale 1.0 → 1.1
-	tween.tween_property(sprite_3d, "scale", Vector3(scale_max, scale_max, 1.0), breath_duration / 2.0) \
-		.set_ease(Tween.EASE_IN_OUT) \
-		.set_trans(Tween.TRANS_SINE)
-	
-	# Expiration : scale 1.1 → 0.9
-	tween.tween_property(sprite_3d, "scale", Vector3(scale_min, scale_min, 1.0), breath_duration / 2.0) \
-		.set_ease(Tween.EASE_IN_OUT) \
-		.set_trans(Tween.TRANS_SINE)
-	
-	# Retour neutre : scale 0.9 → 1.0
-	tween.tween_property(sprite_3d, "scale", Vector3(1.0, 1.0, 1.0), breath_duration / 2.0) \
-		.set_ease(Tween.EASE_IN_OUT) \
-		.set_trans(Tween.TRANS_SINE)
-	
-	# Stocker la référence
-	set_meta("breathing_tween", tween)
-
-# ✅ NOUVELLE FONCTION : Charger le sprite externe ou fallback
 func _load_sprite_texture() -> void:
-	"""Charge le sprite depuis unit.tscn ou utilise le fallback"""
+	"""Charge le sprite externe ou utilise le fallback"""
 	
-	# Tentative de chargement du sprite externe
 	if sprite_path != "" and ResourceLoader.exists(sprite_path):
 		var external_texture = load(sprite_path) as Texture2D
 		
@@ -202,24 +193,21 @@ func _load_sprite_texture() -> void:
 			sprite_3d.hframes = sprite_hframes
 			sprite_3d.vframes = sprite_vframes
 			sprite_3d.frame = sprite_frame
-			#sprite_3d.scale = Vector3(4, 4, 4)
-			print("[BattleUnit3D] ✅ Sprite externe chargé : ", sprite_path, " (frame ", sprite_frame, ")")
+			GlobalLogger.info("BATTLE_UNIT", "Sprite externe chargé : %s (frame %d)" % [sprite_path, sprite_frame])
 			return
 	
-	# Fallback : créer un cercle de couleur
+	# Fallback
 	sprite_3d.texture = _create_unit_texture()
 	sprite_3d.hframes = 1
 	sprite_3d.vframes = 1
 	sprite_3d.frame = 0
-	
-	print("[BattleUnit3D] ⚠️ Sprite fallback utilisé pour ", unit_name)
+	GlobalLogger.warning("BATTLE_UNIT", "Sprite fallback utilisé pour %s" % unit_name)
 
 func _create_unit_texture() -> ImageTexture:
-	"""Crée une texture simple pour le sprite de l'unité (FALLBACK)"""
+	"""Crée une texture simple (FALLBACK)"""
 	var image = Image.create(128, 128, false, Image.FORMAT_RGBA8)
 	image.fill(Color.TRANSPARENT)
 	
-	# Dessiner un cercle coloré
 	for y in range(128):
 		for x in range(128):
 			var dx = x - 64
@@ -230,7 +218,6 @@ func _create_unit_texture() -> ImageTexture:
 				var alpha = 1.0 - (dist / 50.0) * 0.3
 				image.set_pixel(x, y, Color(unit_color.r, unit_color.g, unit_color.b, alpha))
 			
-			# Contour plus foncé
 			if dist > 45 and dist < 50:
 				image.set_pixel(x, y, unit_color.darkened(0.5))
 	
@@ -255,6 +242,7 @@ func _create_circle_texture(size: int, color: Color) -> ImageTexture:
 	return ImageTexture.create_from_image(image)
 
 func _create_selection_ring() -> MeshInstance3D:
+	"""Crée l'anneau de sélection (torus)"""
 	var mesh_instance = MeshInstance3D.new()
 	
 	var torus = TorusMesh.new()
@@ -267,19 +255,241 @@ func _create_selection_ring() -> MeshInstance3D:
 	mesh_instance.rotation_degrees.y = -90
 	mesh_instance.position.y = -0.4
 	
-	var material = StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.emission_enabled = true
-	material.emission_energy_multiplier = 2.0
+	# Material avec cache
+	torus_material = StandardMaterial3D.new()
+	torus_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	torus_material.emission_enabled = true
+	torus_material.emission_energy_multiplier = 2.0
 	
-	mesh_instance.set_surface_override_material(0, material)
+	mesh_instance.set_surface_override_material(0, torus_material)
 	mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	
-	mesh_instance.visible = true
 	
 	return mesh_instance
 
+func _create_hp_bar_with_team_indicator() -> void:
+	"""Crée la barre de HP avec indicateur d'équipe"""
+	
+	hp_bar_container = Node3D.new()
+	hp_bar_container.position = Vector3(0, sprite_height + HP_BAR_HEIGHT_OFFSET, 0)
+	hp_bar_container.top_level = false
+	add_child(hp_bar_container)
+	
+	# FOND DE LA BARRE
+	hp_bar_bg = MeshInstance3D.new()
+	var bg_box = BoxMesh.new()
+	bg_box.size = Vector3(tile_size * HP_BAR_WIDTH_RATIO, 0.08, 0.02)
+	hp_bar_bg.mesh = bg_box
+	
+	var bg_material = StandardMaterial3D.new()
+	bg_material.albedo_color = Color(0.2, 0.2, 0.2)
+	bg_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	bg_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	bg_material.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
+	hp_bar_bg.set_surface_override_material(0, bg_material)
+	hp_bar_bg.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	hp_bar_container.add_child(hp_bar_bg)
+	
+	# BARRE DE HP AVANT-PLAN
+	hp_bar_3d = MeshInstance3D.new()
+	var box = BoxMesh.new()
+	box.size = Vector3(tile_size * HP_BAR_WIDTH_RATIO, 0.06, 0.04)
+	hp_bar_3d.mesh = box
+	hp_bar_3d.position.z = 0.03
+	
+	# Material avec cache
+	hp_bar_material = StandardMaterial3D.new()
+	hp_bar_material.albedo_color = Color.GREEN
+	hp_bar_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	hp_bar_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	hp_bar_material.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
+	hp_bar_material.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
+	hp_bar_material.no_depth_test = false
+	hp_bar_3d.set_surface_override_material(0, hp_bar_material)
+	hp_bar_3d.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	hp_bar_3d.sorting_offset = 0.1
+	hp_bar_container.add_child(hp_bar_3d)
+	
+	# TEAM INDICATOR
+	team_indicator = MeshInstance3D.new()
+	var indicator_box = BoxMesh.new()
+	indicator_box.size = Vector3(0.12, 0.12, 0.04)
+	team_indicator.mesh = indicator_box
+	
+	var bar_width = tile_size * HP_BAR_WIDTH_RATIO
+	team_indicator.position = Vector3(bar_width / 2 + 0.08, -0.04, 0.03)
+	
+	var team_material = StandardMaterial3D.new()
+	team_material.albedo_color = Color.GREEN if is_player_unit else Color.RED
+	team_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	team_material.emission_enabled = true
+	team_material.emission = team_material.albedo_color * 0.5
+	team_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	team_material.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
+	team_indicator.set_surface_override_material(0, team_material)
+	team_indicator.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	hp_bar_container.add_child(team_indicator)
+
+func _create_collision() -> void:
+	"""Crée une collision pour le raycasting"""
+	var area = Area3D.new()
+	var collision_shape = CollisionShape3D.new()
+	
+	var shape = CylinderShape3D.new()
+	shape.radius = tile_size * 0.4
+	shape.height = sprite_height * 2
+	collision_shape.shape = shape
+	collision_shape.position.y = sprite_height
+	
+	area.add_child(collision_shape)
+	add_child(area)
+	
+	area.set_meta("unit", self)
+	area.collision_layer = 2
+	area.collision_mask = 0
+
+# ============================================================================
+# ANIMATION DE RESPIRATION
+# ============================================================================
+
+func _start_breathing_animation() -> void:
+	"""Démarre une animation de respiration fluide et désynchronisée"""
+	
+	if not sprite_3d:
+		return
+	
+	# Attendre un délai aléatoire pour désynchroniser
+	await get_tree().create_timer(randf_range(0.0, BREATH_DELAY_MAX)).timeout
+	
+	# ========== CONFIGURATION ==========
+	
+	# Vitesse basée sur les HP
+	var hp_percent = get_hp_percentage()
+	var breath_speed_multiplier: float
+	
+	if hp_percent > 0.6:
+		breath_speed_multiplier = BREATH_SPEED_HEALTHY
+	elif hp_percent > 0.3:
+		breath_speed_multiplier = BREATH_SPEED_WOUNDED
+	else:
+		breath_speed_multiplier = BREATH_SPEED_CRITICAL
+	
+	# Durée de base
+	var base_breath_duration = randf_range(BREATH_DURATION_MIN, BREATH_DURATION_MAX)
+	var breath_duration = base_breath_duration / breath_speed_multiplier
+	
+	# ========== CHOIX ALÉATOIRE : HAUTEUR OU LARGEUR ==========
+	
+	var is_height_breathing = randf() < 0.5
+	
+	var scale_min = 1.0 - BREATH_INTENSITY
+	var scale_max = 1.0 + BREATH_INTENSITY
+	
+	# Position de base du sprite
+	var base_position_y = sprite_3d.position.y
+	set_meta("breathing_base_y", base_position_y)
+	
+	# ========== CRÉER L'ANIMATION ==========
+	
+	var tween = sprite_3d.create_tween()
+	tween.set_loops()
+	
+	if is_height_breathing:
+		# **RESPIRATION EN HAUTEUR**
+		GlobalLogger.debug("BATTLE_UNIT", "%s respire en HAUTEUR (vitesse x%.1f)" % [unit_name, breath_speed_multiplier])
+		
+		# Inspiration : scale.y 1.0 → 1.1
+		tween.tween_method(
+			_set_height_scale_keep_bottom,
+			1.0,
+			scale_max,
+			breath_duration / 3.0
+		).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+		
+		# Expiration : scale.y 1.1 → 0.9
+		tween.tween_method(
+			_set_height_scale_keep_bottom,
+			scale_max,
+			scale_min,
+			breath_duration / 3.0
+		).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+		
+		# Retour neutre : scale.y 0.9 → 1.0
+		tween.tween_method(
+			_set_height_scale_keep_bottom,
+			scale_min,
+			1.0,
+			breath_duration / 3.0
+		).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+	
+	else:
+		# **RESPIRATION EN LARGEUR**
+		GlobalLogger.debug("BATTLE_UNIT", "%s respire en LARGEUR (vitesse x%.1f)" % [unit_name, breath_speed_multiplier])
+		
+		# Inspiration : scale.x 1.0 → 1.1
+		tween.tween_property(
+			sprite_3d,
+			"scale:x",
+			scale_max,
+			breath_duration / 3.0
+		).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+		
+		# Expiration : scale.x 1.1 → 0.9
+		tween.tween_property(
+			sprite_3d,
+			"scale:x",
+			scale_min,
+			breath_duration / 3.0
+		).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+		
+		# Retour neutre : scale.x 0.9 → 1.0
+		tween.tween_property(
+			sprite_3d,
+			"scale:x",
+			1.0,
+			breath_duration / 3.0
+		).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+	
+	# Stocker la référence
+	set_meta("breathing_tween", tween)
+
+func _set_height_scale_keep_bottom(new_scale_y: float) -> void:
+	"""Modifie le scale.y du sprite en gardant le bas du sprite au même endroit"""
+	
+	if not sprite_3d:
+		return
+	
+	# Récupérer la position de base
+	var base_y = get_meta("breathing_base_y", sprite_height)
+	
+	# Calculer le décalage nécessaire pour garder le bas fixe
+	var sprite_visual_height = 1.0
+	var delta_y = (new_scale_y - 1.0) * sprite_visual_height / 2.0
+	
+	# Appliquer le scale et ajuster la position
+	sprite_3d.scale.y = new_scale_y
+	sprite_3d.position.y = base_y + delta_y
+
+# ============================================================================
+# PROCESS & BILLBOARD
+# ============================================================================
+
+func _process(_delta: float) -> void:
+	"""Faire tourner la barre HP vers la caméra (billboard manuel)"""
+	
+	if not hp_bar_container:
+		return
+	
+	var camera = get_viewport().get_camera_3d()
+	if camera:
+		hp_bar_container.global_transform.basis = camera.global_transform.basis
+
+# ============================================================================
+# TORUS (INDICATEUR DE SÉLECTION)
+# ============================================================================
+
 func update_torus_state(is_current_turn: bool) -> void:
+	"""Met à jour l'état visuel du torus"""
+	
 	if not selection_indicator:
 		return
 	
@@ -301,145 +511,34 @@ func update_torus_state(is_current_turn: bool) -> void:
 	_apply_torus_color()
 
 func _apply_torus_color() -> void:
-	var material = selection_indicator.get_surface_override_material(0) as StandardMaterial3D
+	"""Applique la couleur du torus selon l'état (utilise le cache)"""
 	
-	if not material:
+	if not torus_material:
 		return
 	
-	var color: Color
+	var color = TORUS_COLORS.get(current_torus_state, Color.WHITE)
 	
-	match current_torus_state:
-		TorusState.CAN_ACT_AND_MOVE:
-			color = Color.GREEN
-		TorusState.CAN_ACT_ONLY:
-			color = Color.YELLOW
-		TorusState.CAN_MOVE_ONLY:
-			color = Color.CYAN
-		TorusState.CANNOT_ACT, TorusState.ENEMY_TURN:
-			color = Color.GRAY
-		TorusState.SELECTED:
-			color = Color.RED
-	
-	material.albedo_color = color
-	material.emission = color * 0.8
-	
+	torus_material.albedo_color = color
+	torus_material.emission = color * 0.8
+
 func set_selected(selected: bool) -> void:
+	"""Change l'état de sélection"""
 	is_selected = selected
-	update_torus_state(true)  # Force update
+	update_torus_state(true)
 	selected_changed.emit(selected)
 
-func _create_hp_bar_with_team_indicator() -> void:
-	"""Crée une barre de HP avec team indicator comme enfant"""
-	
-	# Container qui va faire le billboard
-	hp_bar_container = Node3D.new()
-	hp_bar_container.position = Vector3(0, sprite_height + 0.6, 0)
-	hp_bar_container.top_level = false
-	add_child(hp_bar_container)
-	
-	# ========== FOND DE LA BARRE (gris foncé) ==========
-	hp_bar_bg = MeshInstance3D.new()
-	var bg_box = BoxMesh.new()
-	bg_box.size = Vector3(tile_size * 0.8, 0.08, 0.02)
-	hp_bar_bg.mesh = bg_box
-	
-	var bg_material = StandardMaterial3D.new()
-	bg_material.albedo_color = Color(0.2, 0.2, 0.2)
-	bg_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	bg_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	bg_material.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
-	hp_bar_bg.set_surface_override_material(0, bg_material)
-	hp_bar_bg.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	hp_bar_container.add_child(hp_bar_bg)
-	
-	# ========== BARRE DE HP AVANT-PLAN (verte) ==========
-	hp_bar_3d = MeshInstance3D.new()
-	var box = BoxMesh.new()
-	box.size = Vector3(tile_size * 0.8, 0.06, 0.04)
-	hp_bar_3d.mesh = box
-	
-	hp_bar_3d.position.z = 0.03  # Devant le fond
-	
-	var material = StandardMaterial3D.new()
-	material.albedo_color = Color.GREEN
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
-	material.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
-	material.no_depth_test = false
-	hp_bar_3d.set_surface_override_material(0, material)
-	hp_bar_3d.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	
-	hp_bar_3d.sorting_offset = 0.1
-	
-	hp_bar_container.add_child(hp_bar_3d)
-	
-	# ========== TEAM INDICATOR ==========
-	team_indicator = MeshInstance3D.new()
-	var indicator_box = BoxMesh.new()
-	indicator_box.size = Vector3(0.12, 0.12, 0.04)
-	team_indicator.mesh = indicator_box
-	
-	var bar_width = tile_size * 0.8
-	var bar_height = 0.08
-	team_indicator.position = Vector3(
-		bar_width / 2 + 0.08,
-		-bar_height / 2,
-		0.03
-	)
-	
-	var team_material = StandardMaterial3D.new()
-	team_material.albedo_color = Color.GREEN if is_player_unit else Color.RED
-	team_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	team_material.emission_enabled = true
-	team_material.emission = team_material.albedo_color * 0.5
-	team_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	team_material.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
-	team_indicator.set_surface_override_material(0, team_material)
-	team_indicator.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	
-	hp_bar_container.add_child(team_indicator)
-	
-func _process(_delta: float) -> void:
-	"""Faire tourner la barre HP vers la caméra"""
-	var camera = get_viewport().get_camera_3d()
-	if not camera:
-		return
-	
-	if hp_bar_container:
-		var cam_basis = camera.global_transform.basis
-		hp_bar_container.global_transform.basis = cam_basis
-
-func _create_collision() -> void:
-	"""Crée une collision pour le raycasting"""
-	var area = Area3D.new()
-	var collision_shape = CollisionShape3D.new()
-	
-	var shape = CylinderShape3D.new()
-	shape.radius = tile_size * 0.4
-	shape.height = sprite_height * 2
-	collision_shape.shape = shape
-	collision_shape.position.y = sprite_height
-	
-	area.add_child(collision_shape)
-	add_child(area)
-	
-	# Métadonnées pour l'identification
-	area.set_meta("unit", self)
-	area.collision_layer = 2  # Layer 2 pour les unités
-	area.collision_mask = 0
-
 # ============================================================================
-# SANTÉ (identique à la version 2D)
+# SANTÉ
 # ============================================================================
 
 func take_damage(damage: int) -> int:
+	"""Inflige des dégâts à l'unité"""
 	var actual_damage = max(1, damage - defense_power)
 	current_hp = max(0, current_hp - actual_damage)
 	_update_hp_bar()
 	
 	health_changed.emit(current_hp, max_hp)
-	print("[", unit_name, "] Prend ", actual_damage, " dégâts (HP: ", current_hp, "/", max_hp, ")")
+	GlobalLogger.info("BATTLE_UNIT", "%s prend %d dégâts (HP: %d/%d)" % [unit_name, actual_damage, current_hp, max_hp])
 	
 	_animate_damage()
 	
@@ -449,6 +548,7 @@ func take_damage(damage: int) -> int:
 	return actual_damage
 
 func heal(amount: int) -> int:
+	"""Soigne l'unité"""
 	var old_hp = current_hp
 	current_hp = min(max_hp, current_hp + amount)
 	var actual_heal = current_hp - old_hp
@@ -456,13 +556,14 @@ func heal(amount: int) -> int:
 	_update_hp_bar()
 	health_changed.emit(current_hp, max_hp)
 	
-	print("[", unit_name, "] Soigné de ", actual_heal, " HP")
+	GlobalLogger.info("BATTLE_UNIT", "%s soigné de %d HP" % [unit_name, actual_heal])
 	_animate_heal()
 	
 	return actual_heal
 
 func die() -> void:
-	print("[", unit_name, "] est mort")
+	"""Tue l'unité"""
+	GlobalLogger.info("BATTLE_UNIT", "%s est mort" % unit_name)
 	_animate_death()
 	died.emit()
 
@@ -470,10 +571,47 @@ func is_alive() -> bool:
 	return current_hp > 0
 
 func get_hp_percentage() -> float:
+	if max_hp <= 0:
+		return 0.0
 	return float(current_hp) / float(max_hp)
 
 # ============================================================================
-# ACTIONS & ÉTAT (identiques)
+# BARRE DE HP
+# ============================================================================
+
+func _update_hp_bar() -> void:
+	"""Met à jour la barre de HP 3D (utilise le cache de material)"""
+	
+	if not hp_bar_3d or not hp_bar_3d.mesh or not hp_bar_material:
+		return
+	
+	if max_hp <= 0:
+		GlobalLogger.warning("BATTLE_UNIT", "max_hp invalide pour %s" % unit_name)
+		return
+	
+	var hp_percent = get_hp_percentage()
+	
+	# Redimensionner la barre
+	var bar_max_width = tile_size * HP_BAR_WIDTH_RATIO
+	var box_mesh = hp_bar_3d.mesh as BoxMesh
+	
+	if box_mesh:
+		var current_width = bar_max_width * hp_percent
+		box_mesh.size.x = current_width
+		
+		var offset = (bar_max_width - current_width) / 2.0
+		hp_bar_3d.position.x = -offset
+	
+	# Couleur selon HP
+	if hp_percent > 0.6:
+		hp_bar_material.albedo_color = Color.GREEN
+	elif hp_percent > 0.3:
+		hp_bar_material.albedo_color = Color.YELLOW
+	else:
+		hp_bar_material.albedo_color = Color.RED
+
+# ============================================================================
+# ACTIONS & ÉTAT
 # ============================================================================
 
 func can_move() -> bool:
@@ -486,6 +624,7 @@ func can_do_anything() -> bool:
 	return can_move() or can_act()
 
 func reset_for_new_turn() -> void:
+	"""Réinitialise l'unité pour un nouveau tour"""
 	movement_used = false
 	action_used = false
 	has_acted_this_turn = false
@@ -493,6 +632,7 @@ func reset_for_new_turn() -> void:
 	update_torus_state(true)
 
 func _process_status_effects() -> void:
+	"""Décrémente les effets de statut"""
 	var effects_to_remove: Array[String] = []
 	
 	for effect_name in status_effects:
@@ -510,73 +650,35 @@ func _process_status_effects() -> void:
 func add_status_effect(effect_name: String, duration: int) -> void:
 	status_effects[effect_name] = duration
 	status_effect_applied.emit(effect_name)
-	print("[", unit_name, "] Effet ajouté: ", effect_name)
+	GlobalLogger.info("BATTLE_UNIT", "%s : effet ajouté : %s" % [unit_name, effect_name])
 
 func remove_status_effect(effect_name: String) -> void:
 	if status_effects.has(effect_name):
 		status_effects.erase(effect_name)
 		status_effect_removed.emit(effect_name)
-		print("[", unit_name, "] Effet retiré: ", effect_name)
+		GlobalLogger.info("BATTLE_UNIT", "%s : effet retiré : %s" % [unit_name, effect_name])
 
 func has_status_effect(effect_name: String) -> bool:
 	return status_effects.has(effect_name)
 
 # ============================================================================
-# VISUELS & ANIMATIONS 3D
+# ANIMATIONS
 # ============================================================================
 
-func _update_hp_bar() -> void:
-	"""Met à jour la barre de HP 3D"""
-	if not hp_bar_3d or not hp_bar_3d.mesh:
-		return
-	
-	if max_hp <= 0:
-		push_warning("[BattleUnit3D] max_hp invalide pour ", unit_name)
-		return
-	
-	var hp_percent = get_hp_percentage()
-	
-	var bar_max_width = tile_size * 0.8
-	if bar_max_width <= 0:
-		bar_max_width = 0.8
-	
-	var box_mesh = hp_bar_3d.mesh as BoxMesh
-	if box_mesh:
-		var current_width = bar_max_width * hp_percent
-		box_mesh.size.x = current_width
-		
-		var offset = (bar_max_width - current_width) / 2.0
-		hp_bar_3d.position.x = -offset
-	
-	var material = hp_bar_3d.get_surface_override_material(0) as StandardMaterial3D
-	if material:
-		if hp_percent > 0.6:
-			material.albedo_color = Color.GREEN
-		elif hp_percent > 0.3:
-			material.albedo_color = Color.YELLOW
-		else:
-			material.albedo_color = Color.RED
-
-func _update_visuals() -> void:
-	"""Met à jour tous les visuels"""
-	if not can_do_anything():
-		sprite_3d.modulate = Color(0.6, 0.6, 0.6)
-	else:
-		sprite_3d.modulate = Color(1, 1, 1)
-
 func _animate_damage() -> void:
-	"""Animation de dégâts"""
+	"""Animation flash rouge"""
 	var tween = create_tween()
 	tween.tween_property(sprite_3d, "modulate", Color(1, 0.3, 0.3), 0.1)
 	tween.tween_property(sprite_3d, "modulate", Color(1, 1, 1), 0.1)
 
 func _animate_heal() -> void:
-	"""Animation de soin"""
+	"""Animation flash vert"""
 	var tween = create_tween()
 	tween.tween_property(sprite_3d, "modulate", Color(0.3, 1, 0.3), 0.1)
 	tween.tween_property(sprite_3d, "modulate", Color(1, 1, 1), 0.1)
 
 func _animate_death() -> void:
+	"""Animation de mort"""
 	var tween = create_tween()
 	tween.set_parallel(true)
 	
@@ -595,10 +697,11 @@ func _animate_death() -> void:
 	tween.tween_callback(queue_free)
 
 # ============================================================================
-# DONNÉES (identiques)
+# DONNÉES
 # ============================================================================
 
 func get_unit_data() -> Dictionary:
+	"""Retourne les données de l'unité"""
 	return {
 		"id": unit_id,
 		"name": unit_name,
@@ -616,9 +719,6 @@ func get_unit_data() -> Dictionary:
 		"can_act": can_act()
 	}
 
-# ============================================================================
-# INITIALISATION DEPUIS DONNÉES
-# ============================================================================
 func initialize_unit(data: Dictionary) -> void:
 	"""Initialise l'unité à partir d'un dictionnaire de données"""
 	
@@ -637,10 +737,10 @@ func initialize_unit(data: Dictionary) -> void:
 	if data.has("position"):
 		grid_position = data.position
 	
+	# Stats
 	var temp_max_hp = 100
 	var temp_current_hp = -1
 	
-	# Stats depuis le bloc "stats"
 	if data.has("stats"):
 		var stats = data.stats
 		if stats.has("hp"):
@@ -654,7 +754,6 @@ func initialize_unit(data: Dictionary) -> void:
 		if stats.has("range"):
 			attack_range = stats.range
 	
-	# Stats directes (écrasent les stats du bloc si présentes)
 	if data.has("max_hp"):
 		temp_max_hp = data.max_hp
 	
@@ -662,12 +761,7 @@ func initialize_unit(data: Dictionary) -> void:
 		temp_current_hp = data.hp
 	
 	max_hp = temp_max_hp
-	
-	if temp_current_hp >= 0:
-		current_hp = temp_current_hp
-	else:
-		current_hp = max_hp
-	
+	current_hp = temp_current_hp if temp_current_hp >= 0 else max_hp
 	current_hp = min(current_hp, max_hp)
 	
 	if data.has("attack"):
@@ -696,23 +790,19 @@ func initialize_unit(data: Dictionary) -> void:
 			for effect_name in effects:
 				status_effects[effect_name] = effects[effect_name]
 	
-	# ✅ NOUVEAU : Sprite personnalisé
+	# Sprite personnalisé
 	if data.has("sprite_path"):
 		sprite_path = data.sprite_path
-	
 	if data.has("sprite_frame"):
 		sprite_frame = data.sprite_frame
-	
 	if data.has("sprite_hframes"):
 		sprite_hframes = data.sprite_hframes
-	
 	if data.has("sprite_vframes"):
 		sprite_vframes = data.sprite_vframes
 	
-	# ✅ NOUVEAU : Anneaux équipés
+	# Anneaux équipés
 	if data.has("materialization_ring"):
 		equipped_materialization_ring = data.materialization_ring
-	
 	if data.has("channeling_ring"):
 		equipped_channeling_ring = data.channeling_ring
 	
@@ -725,20 +815,26 @@ func initialize_unit(data: Dictionary) -> void:
 	level = data.get("level", 1)
 	xp = data.get("xp", 0)
 	
-	print("[BattleUnit3D] Unité initialisée: ", unit_name, " (", unit_id, ")")
-	print("  → HP: ", current_hp, "/", max_hp, " (", get_hp_percentage() * 100, "%)")
-	print("  → Anneaux: ", equipped_materialization_ring, " + ", equipped_channeling_ring)
+	GlobalLogger.info("BATTLE_UNIT", "Unité initialisée : %s (ID: %s)" % [unit_name, unit_id])
+	GlobalLogger.debug("BATTLE_UNIT", "  → HP: %d/%d (%.1f%%)" % [current_hp, max_hp, get_hp_percentage() * 100])
+	GlobalLogger.debug("BATTLE_UNIT", "  → Anneaux: %s + %s" % [equipped_materialization_ring, equipped_channeling_ring])
 
 func award_xp(amount: int) -> void:
+	"""Donne de l'XP à l'unité"""
 	if not is_player_unit:
 		return
 	
 	xp += amount
-	print("[", unit_name, "] +", amount, " XP (Total: ", xp, ")")
+	GlobalLogger.info("BATTLE_UNIT", "%s : +%d XP (Total: %d)" % [unit_name, amount, xp])
 	TeamManager.add_xp(unit_id, amount)
 
+# ============================================================================
+# NETTOYAGE
+# ============================================================================
 
 func _exit_tree() -> void:
+	"""Nettoie les tweens en cours"""
+	
 	# Arrêter le tween de respiration
 	if has_meta("breathing_tween"):
 		var tween = get_meta("breathing_tween") as Tween
@@ -750,3 +846,5 @@ func _exit_tree() -> void:
 		var tween = get_meta("blink_tween") as Tween
 		if tween and tween.is_valid():
 			tween.kill()
+	
+	GlobalLogger.debug("BATTLE_UNIT", "Unité %s nettoyée" % unit_name)
