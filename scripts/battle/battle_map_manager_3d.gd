@@ -716,14 +716,48 @@ func _deselect_unit() -> void:
 # ============================================================================
 # MENU D'ACTIONS
 # ============================================================================
-
 func _open_action_menu() -> void:
 	if not selected_unit:
 		return
 	
-	# Positionner le menu près de l'unité sélectionnée
-	var screen_pos = camera.unproject_position(selected_unit.position)
-	action_popup.position = screen_pos + Vector2(50, -100)
+	# ✅ NOUVEAU : Calculer position optimale dans les coins
+	var screen_size = get_viewport().get_visible_rect().size
+	var unit_screen_pos = camera.unproject_position(selected_unit.position)
+	
+	# Déterminer le coin le plus proche qui n'est pas obstrué par l'unité
+	var corners = [
+		Vector2(50, 50),                              # Haut-gauche
+		Vector2(screen_size.x - 250, 50),            # Haut-droite
+		Vector2(50, screen_size.y - 400),            # Bas-gauche
+		Vector2(screen_size.x - 250, screen_size.y - 400)  # Bas-droite
+	]
+	
+	# Choisir le coin le plus éloigné de l'unité
+	var best_corner = corners[0]
+	var max_distance = 0.0
+	
+	for corner in corners:
+		var distance = unit_screen_pos.distance_to(corner)
+		if distance > max_distance:
+			max_distance = distance
+			best_corner = corner
+	
+	action_popup.position = best_corner
+	
+	# ✅ NOUVEAU : Ajouter transparence au popup
+	if not action_popup.has_theme_stylebox_override("panel"):
+		var style = StyleBoxFlat.new()
+		style.bg_color = Color(0.1, 0.1, 0.12, 0.85)  # 85% opacité au lieu de 100%
+		style.border_color = Color(0.7, 0.7, 0.8, 0.9)
+		style.border_width_left = 2
+		style.border_width_top = 2
+		style.border_width_right = 2
+		style.border_width_bottom = 2
+		style.corner_radius_top_left = 8
+		style.corner_radius_top_right = 8
+		style.corner_radius_bottom_left = 8
+		style.corner_radius_bottom_right = 8
+		action_popup.add_theme_stylebox_override("panel", style)
 	
 	# Activer/désactiver les boutons selon l'état de l'unité
 	move_button.disabled = not selected_unit.can_move()
@@ -732,7 +766,7 @@ func _open_action_menu() -> void:
 	abilities_button.disabled = not selected_unit.can_act() or selected_unit.abilities.is_empty()
 	
 	action_popup.popup()
-
+	
 func _close_all_menus() -> void:
 	action_popup.hide()
 	duo_popup.hide()
@@ -900,20 +934,31 @@ func _on_duo_option_selected(partner: BattleUnit3D, ring_combo: Dictionary) -> v
 		"info"
 	)
 	
+
 func _play_duo_formation_effect(leader: BattleUnit3D, support: BattleUnit3D) -> void:
 	"""Anime un effet de bounce sur les deux unités du duo"""
 	
 	var duration = 0.4
 	var scale_factor = 1.3
 	
+	# Sauvegarder les positions initiales
+	var leader_initial_y = leader.position.y
+	var support_initial_y = support.position.y
+	
 	# Leader
 	var tween_leader = leader.create_tween()
 	tween_leader.set_parallel(true)
 	tween_leader.tween_property(leader, "scale", Vector3.ONE * scale_factor, duration / 2).set_ease(Tween.EASE_OUT)
-	tween_leader.tween_property(leader, "position:y", leader.position.y + 0.5, duration / 2).set_ease(Tween.EASE_OUT)
+	tween_leader.tween_property(leader, "position:y", leader_initial_y + 0.5, duration / 2).set_ease(Tween.EASE_OUT)
 	tween_leader.set_parallel(false)
 	tween_leader.tween_property(leader, "scale", Vector3.ONE, duration / 2).set_ease(Tween.EASE_IN)
-	tween_leader.tween_property(leader, "position:y", leader.position.y, duration / 2).set_ease(Tween.EASE_IN)
+	tween_leader.tween_property(leader, "position:y", leader_initial_y, duration / 2).set_ease(Tween.EASE_IN)
+	
+	# ✅ AJOUT : Forcer la position finale
+	tween_leader.finished.connect(func():
+		leader.position.y = leader_initial_y
+		leader.scale = Vector3.ONE
+	)
 	
 	# Support (légèrement décalé)
 	await get_tree().create_timer(0.1).timeout
@@ -921,12 +966,18 @@ func _play_duo_formation_effect(leader: BattleUnit3D, support: BattleUnit3D) -> 
 	var tween_support = support.create_tween()
 	tween_support.set_parallel(true)
 	tween_support.tween_property(support, "scale", Vector3.ONE * scale_factor, duration / 2).set_ease(Tween.EASE_OUT)
-	tween_support.tween_property(support, "position:y", support.position.y + 0.5, duration / 2).set_ease(Tween.EASE_OUT)
+	tween_support.tween_property(support, "position:y", support_initial_y + 0.5, duration / 2).set_ease(Tween.EASE_OUT)
 	tween_support.set_parallel(false)
 	tween_support.tween_property(support, "scale", Vector3.ONE, duration / 2).set_ease(Tween.EASE_IN)
-	tween_support.tween_property(support, "position:y", support.position.y, duration / 2).set_ease(Tween.EASE_IN)
+	tween_support.tween_property(support, "position:y", support_initial_y, duration / 2).set_ease(Tween.EASE_IN)
 	
-	# Effet visuel supplémentaire (optionnel)
+	# ✅ AJOUT : Forcer la position finale
+	tween_support.finished.connect(func():
+		support.position.y = support_initial_y
+		support.scale = Vector3.ONE
+	)
+	
+	# Effet visuel supplémentaire
 	if leader.sprite_3d:
 		var sprite_tween = leader.sprite_3d.create_tween()
 		sprite_tween.tween_property(leader.sprite_3d, "modulate", Color(1, 1, 0.5), 0.2)
@@ -1078,9 +1129,9 @@ func _check_battle_end() -> void:
 			_on_victory()
 
 func _end_battle(victory: bool) -> void:
-	
 	is_battle_active = false
 	duo_system.clear_all_duos()
+	
 	if victory:
 		_award_xp_to_survivors()
 	
@@ -1099,8 +1150,17 @@ func _end_battle(victory: bool) -> void:
 	}
 	
 	EventBus.battle_ended.emit(results)
+	
+	# ✅ CHANGEMENT : Message de notification au lieu d'écran résultats
+	if victory:
+		EventBus.notify("Victoire ! Tour %d - MVP: %s" % [current_turn, results.mvp.get("name", "N/A")], "success")
+	else:
+		EventBus.notify("Défaite...", "error")
+	
 	await get_tree().create_timer(2.0).timeout
-	EventBus.change_scene(SceneRegistry.SceneID.BATTLE_RESULTS)
+	
+	# ✅ CHANGEMENT : Retour direct à la world map
+	EventBus.change_scene(SceneRegistry.SceneID.WORLD_MAP)
 
 func _award_xp_to_survivors() -> void:
 	var player_units = unit_manager.get_alive_player_units()

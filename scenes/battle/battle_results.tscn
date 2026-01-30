@@ -1,0 +1,18 @@
+# scenes/battle/battle_results.gd
+extends Control
+
+func _ready() -> void:
+	# Temporaire : Afficher juste un bouton retour
+	var label = Label.new()
+	label.text = "Victoire ! (Écran de résultats à venir)"
+	label.position = Vector2(400, 300)
+	add_child(label)
+	
+	var button = Button.new()
+	button.text = "Retour à la carte"
+	button.position = Vector2(400, 400)
+	button.pressed.connect(_on_return_pressed)
+	add_child(button)
+
+func _on_return_pressed() -> void:
+	EventBus.change_scene(SceneRegistry.SceneID.WORLD_MAP)
