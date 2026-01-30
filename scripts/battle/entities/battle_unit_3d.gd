@@ -28,7 +28,7 @@ signal status_effect_removed(effect_name: String)
 # ============================================================================
 
 var tile_size: float = 1.0
-var sprite_height: float = 1.0  # Hauteur du sprite au-dessus du sol
+var sprite_height: float = 0.2  # Hauteur du sprite au-dessus du sol
 
 # ============================================================================
 # IDENTITÉ
@@ -121,7 +121,7 @@ func _create_visuals_3d() -> void:
 	# 2. SPRITE PRINCIPAL (Billboard)
 	sprite_3d = Sprite3D.new()
 	sprite_3d.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	sprite_3d.pixel_size = 0.01
+	sprite_3d.pixel_size = 0.04
 	sprite_3d.position.y = sprite_height
 	sprite_3d.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	
@@ -165,7 +165,7 @@ func _load_sprite_texture() -> void:
 			sprite_3d.hframes = sprite_hframes
 			sprite_3d.vframes = sprite_vframes
 			sprite_3d.frame = sprite_frame
-			
+			#sprite_3d.scale = Vector3(4, 4, 4)
 			print("[BattleUnit3D] ✅ Sprite externe chargé : ", sprite_path, " (frame ", sprite_frame, ")")
 			return
 	

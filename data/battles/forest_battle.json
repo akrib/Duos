@@ -21,10 +21,10 @@
         "speed": 5,
         "range": 1
       },
-      "sprite_path": "res://asset/unit/unit.png",
-      "sprite_frame": 1,
-      "sprite_hframes": 7,
-      "sprite_vframes": 3,
+      "sprite_path": "res://asset/unit/warrior_m.png",
+      "sprite_frame": 7,
+      "sprite_hframes": 3,
+      "sprite_vframes": 4,
       
       "materialization_ring": "mat_basic_line",
       "channeling_ring": "chan_poison",
@@ -43,10 +43,10 @@
         "speed": 4,
         "range": 3
       },
-      "sprite_path": "res://asset/unit/unit.png",
-      "sprite_frame": 2,
-      "sprite_hframes": 7,
-      "sprite_vframes": 3,
+      "sprite_path": "res://asset/unit/mage_m.png",
+      "sprite_frame": 7,
+      "sprite_hframes": 3,
+      "sprite_vframes": 4,
       
       "materialization_ring": "mat_basic_line",
       "channeling_ring": "chan_poison",
@@ -65,10 +65,10 @@
         "speed": 6,
         "range": 4
       },
-      "sprite_path": "res://asset/unit/unit.png",
-      "sprite_frame": 3,
-      "sprite_hframes": 7,
-      "sprite_vframes": 3,
+      "sprite_path": "res://asset/unit/ranger_m.png",
+      "sprite_frame": 7,
+      "sprite_hframes": 3,
+      "sprite_vframes": 4,
       
       "materialization_ring": "mat_basic_line",
       "channeling_ring": "chan_poison",
@@ -89,10 +89,10 @@
         "speed": 5,
         "range": 3
       },
-      "sprite_path": "res://asset/unit/unit.png",
-      "sprite_frame": 13,
-      "sprite_hframes": 7,
-      "sprite_vframes": 3,
+      "sprite_path": "res://asset/unit/ninja_m.png",
+      "sprite_frame": 7,
+      "sprite_hframes": 3,
+      "sprite_vframes": 4,
       
       "materialization_ring": "mat_basic_line",
       "channeling_ring": "chan_poison",
@@ -111,10 +111,10 @@
         "speed": 7,
         "range": 1
       },
-      "sprite_path": "res://asset/unit/unit.png",
-      "sprite_frame": 12,
-      "sprite_hframes": 7,
-      "sprite_vframes": 3,
+      "sprite_path": "res://asset/unit/ninja_f.png",
+      "sprite_frame": 7,
+      "sprite_hframes": 3,
+      "sprite_vframes": 4,
       
       "materialization_ring": "mat_basic_line",
       "channeling_ring": "chan_poison",
@@ -133,10 +133,10 @@
         "speed": 3,
         "range": 2
       },
-      "sprite_path": "res://asset/unit/unit.png",
-      "sprite_frame": 11,
-      "sprite_hframes": 7,
-      "sprite_vframes": 3,
+      "sprite_path": "res://asset/unit/ninja_m.png",
+      "sprite_frame": 7,
+      "sprite_hframes": 3,
+      "sprite_vframes": 4,
       
       "materialization_ring": "mat_basic_line",
       "channeling_ring": "chan_poison",
