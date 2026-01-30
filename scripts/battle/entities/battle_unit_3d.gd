@@ -149,8 +149,45 @@ func _create_visuals_3d() -> void:
 		if child is VisualInstance3D:
 			child.visible = true
 			child.show()
-	
+	_start_breathing_animation()
 	print("[BattleUnit3D] 👁️ Visuals created for ", unit_name)
+
+
+func _start_breathing_animation() -> void:
+	"""Démarre une animation de respiration fluide et désynchronisée"""
+	
+	if not sprite_3d:
+		return
+	
+	# Attendre un délai aléatoire pour désynchroniser (0.0 à 2.0 secondes)
+	await get_tree().create_timer(randf_range(0.0, 2.0)).timeout
+	
+	# Paramètres de respiration
+	var breath_duration = randf_range(2.5, 3.5)  # Durée variable (2.5s à 3.5s)
+	var scale_min = 0.9  # -10%
+	var scale_max = 1.1  # +10%
+	
+	# Créer le tween en boucle
+	var tween = sprite_3d.create_tween()
+	tween.set_loops()
+	
+	# Inspiration : scale 1.0 → 1.1
+	tween.tween_property(sprite_3d, "scale", Vector3(scale_max, scale_max, 1.0), breath_duration / 2.0) \
+		.set_ease(Tween.EASE_IN_OUT) \
+		.set_trans(Tween.TRANS_SINE)
+	
+	# Expiration : scale 1.1 → 0.9
+	tween.tween_property(sprite_3d, "scale", Vector3(scale_min, scale_min, 1.0), breath_duration / 2.0) \
+		.set_ease(Tween.EASE_IN_OUT) \
+		.set_trans(Tween.TRANS_SINE)
+	
+	# Retour neutre : scale 0.9 → 1.0
+	tween.tween_property(sprite_3d, "scale", Vector3(1.0, 1.0, 1.0), breath_duration / 2.0) \
+		.set_ease(Tween.EASE_IN_OUT) \
+		.set_trans(Tween.TRANS_SINE)
+	
+	# Stocker la référence
+	set_meta("breathing_tween", tween)
 
 # ✅ NOUVELLE FONCTION : Charger le sprite externe ou fallback
 func _load_sprite_texture() -> void:
@@ -699,3 +736,17 @@ func award_xp(amount: int) -> void:
 	xp += amount
 	print("[", unit_name, "] +", amount, " XP (Total: ", xp, ")")
 	TeamManager.add_xp(unit_id, amount)
+
+
+func _exit_tree() -> void:
+	# Arrêter le tween de respiration
+	if has_meta("breathing_tween"):
+		var tween = get_meta("breathing_tween") as Tween
+		if tween and tween.is_valid():
+			tween.kill()
+	
+	# Arrêter le tween de clignotement
+	if has_meta("blink_tween"):
+		var tween = get_meta("blink_tween") as Tween
+		if tween and tween.is_valid():
+			tween.kill()

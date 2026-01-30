@@ -719,46 +719,10 @@ func _deselect_unit() -> void:
 func _open_action_menu() -> void:
 	if not selected_unit:
 		return
-	
-	# ✅ NOUVEAU : Calculer position optimale dans les coins
-	var screen_size = get_viewport().get_visible_rect().size
-	var unit_screen_pos = camera.unproject_position(selected_unit.position)
-	
-	# Déterminer le coin le plus proche qui n'est pas obstrué par l'unité
-	var corners = [
-		Vector2(50, 50),                              # Haut-gauche
-		Vector2(screen_size.x - 250, 50),            # Haut-droite
-		Vector2(50, screen_size.y - 400),            # Bas-gauche
-		Vector2(screen_size.x - 250, screen_size.y - 400)  # Bas-droite
-	]
-	
-	# Choisir le coin le plus éloigné de l'unité
-	var best_corner = corners[0]
-	var max_distance = 0.0
-	
-	for corner in corners:
-		var distance = unit_screen_pos.distance_to(corner)
-		if distance > max_distance:
-			max_distance = distance
-			best_corner = corner
-	
-	action_popup.position = best_corner
-	
-	# ✅ NOUVEAU : Ajouter transparence au popup
-	if not action_popup.has_theme_stylebox_override("panel"):
-		var style = StyleBoxFlat.new()
-		style.bg_color = Color(0.1, 0.1, 0.12, 0.85)  # 85% opacité au lieu de 100%
-		style.border_color = Color(0.7, 0.7, 0.8, 0.9)
-		style.border_width_left = 2
-		style.border_width_top = 2
-		style.border_width_right = 2
-		style.border_width_bottom = 2
-		style.corner_radius_top_left = 8
-		style.corner_radius_top_right = 8
-		style.corner_radius_bottom_left = 8
-		style.corner_radius_bottom_right = 8
-		action_popup.add_theme_stylebox_override("panel", style)
-	
+
+	# Positionner le menu près de l'unité sélectionnée
+	var screen_pos = camera.unproject_position(selected_unit.position)
+	action_popup.position = screen_pos + Vector2(50, -100)
 	# Activer/désactiver les boutons selon l'état de l'unité
 	move_button.disabled = not selected_unit.can_move()
 	attack_button.disabled = not selected_unit.can_act()
@@ -880,22 +844,32 @@ func _open_duo_selection_menu() -> void:
 			var duo_option = DUO_ATTACK_OPTION_SCENE.instantiate()
 			duo_options_container.add_child(duo_option)
 			
-			# ✅ Passer le partenaire à setup()
 			duo_option.setup(partner_ring_data, leader_ring_data, partner)
 			
-			# ✅ Animation bounce au SURVOL
+			# ✅ MODIFIÉ : Clignotement au survol
 			duo_option.option_hovered.connect(
 				func(hovered_partner: BattleUnit3D):
 					if support_mini_card:
 						support_mini_card.setup_from_unit(hovered_partner)
 					
-					# Jouer l'animation bounce
+					# Lancer le clignotement
 					_play_duo_formation_effect(selected_unit, hovered_partner)
+			)
+		
+		# ✅ NOUVEAU : Arrêter le clignotement quand la souris sort
+			duo_option.option_unhovered.connect(
+				func(unhovered_partner: BattleUnit3D):
+					_stop_blink_effect(selected_unit)
+					_stop_blink_effect(unhovered_partner)
 			)
 			
 			# Connexion : sélection
 			duo_option.option_selected.connect(
 				func(mana_id, weapon_id):
+					# Arrêter tous les clignotements
+					_stop_blink_effect(selected_unit)
+					_stop_blink_effect(partner)
+					
 					_on_duo_option_selected(partner, {
 						"mana_ring": mana_id,
 						"weapon_ring": weapon_id
@@ -907,12 +881,51 @@ func _open_duo_selection_menu() -> void:
 	if is_last_survivor:
 		solo_button_duo.text = "⚔️ Attaquer (Dernier survivant)"
 	
-	# Positionner et afficher
-	var screen_pos = camera.unproject_position(selected_unit.position)
-	duo_popup.position = screen_pos + Vector2(50, -200)
+	# ✅ NOUVEAU : Positionner dans le coin SUPÉRIEUR DROIT avec transparence
+	var screen_size = get_viewport().get_visible_rect().size
+	duo_popup.position = Vector2(screen_size.x - 1020, 20)  # Coin supérieur droit
+	
+	# ✅ NOUVEAU : Ajouter de la transparence
+	_setup_duo_popup_transparency()
+	
 	duo_popup.popup()
 	
 	current_action_state = ActionState.CHOOSING_DUO
+	
+func _setup_duo_popup_transparency() -> void:
+	"""Configure la transparence du popup de duo pour voir à travers"""
+	
+	if not duo_popup.has_theme_stylebox_override("panel"):
+		var style = StyleBoxFlat.new()
+		style.bg_color = Color(0.1, 0.1, 0.12, 0.85)  # 85% opacité au lieu de 100%
+		style.border_color = Color(0.7, 0.7, 0.8, 0.9)
+		style.border_width_left = 3
+		style.border_width_top = 3
+		style.border_width_right = 3
+		style.border_width_bottom = 3
+		style.corner_radius_top_left = 12
+		style.corner_radius_top_right = 12
+		style.corner_radius_bottom_left = 12
+		style.corner_radius_bottom_right = 12
+		
+		duo_popup.add_theme_stylebox_override("panel", style)
+	
+	# Appliquer une légère transparence aux cartes aussi
+	if support_card_container and not support_card_container.has_theme_stylebox_override("panel"):
+		var card_style = StyleBoxFlat.new()
+		card_style.bg_color = Color(0.15, 0.15, 0.18, 0.90)
+		card_style.border_width_left = 2
+		card_style.border_width_top = 2
+		card_style.border_width_right = 2
+		card_style.border_width_bottom = 2
+		card_style.border_color = Color(0.6, 0.6, 0.7, 1)
+		card_style.corner_radius_top_left = 10
+		card_style.corner_radius_top_right = 10
+		card_style.corner_radius_bottom_right = 10
+		card_style.corner_radius_bottom_left = 10
+		
+		support_card_container.add_theme_stylebox_override("panel", card_style)
+		leader_card_container.add_theme_stylebox_override("panel", card_style)
 
 func _on_duo_option_selected(partner: BattleUnit3D, ring_combo: Dictionary) -> void:
 	"""Appelé quand l'utilisateur sélectionne une option Mana + Arme"""
@@ -936,57 +949,51 @@ func _on_duo_option_selected(partner: BattleUnit3D, ring_combo: Dictionary) -> v
 	
 
 func _play_duo_formation_effect(leader: BattleUnit3D, support: BattleUnit3D) -> void:
-	"""Anime un effet de bounce sur les deux unités du duo"""
+	"""Lance un effet de clignotement lent sur les deux unités du duo"""
 	
-	var duration = 0.4
-	var scale_factor = 1.3
+	_start_blink_effect(leader)
+	_start_blink_effect(support)
 	
-	# Sauvegarder les positions initiales
-	var leader_initial_y = leader.position.y
-	var support_initial_y = support.position.y
+
+func _start_blink_effect(unit: BattleUnit3D) -> void:
+	"""Démarre un clignotement lent en boucle sur une unité"""
 	
-	# Leader
-	var tween_leader = leader.create_tween()
-	tween_leader.set_parallel(true)
-	tween_leader.tween_property(leader, "scale", Vector3.ONE * scale_factor, duration / 2).set_ease(Tween.EASE_OUT)
-	tween_leader.tween_property(leader, "position:y", leader_initial_y + 0.5, duration / 2).set_ease(Tween.EASE_OUT)
-	tween_leader.set_parallel(false)
-	tween_leader.tween_property(leader, "scale", Vector3.ONE, duration / 2).set_ease(Tween.EASE_IN)
-	tween_leader.tween_property(leader, "position:y", leader_initial_y, duration / 2).set_ease(Tween.EASE_IN)
+	if not unit or not unit.sprite_3d:
+		return
 	
-	# ✅ AJOUT : Forcer la position finale
-	tween_leader.finished.connect(func():
-		leader.position.y = leader_initial_y
-		leader.scale = Vector3.ONE
-	)
+	# Arrêter le tween précédent si existant
+	if unit.has_meta("blink_tween"):
+		var old_tween = unit.get_meta("blink_tween") as Tween
+		if old_tween and old_tween.is_valid():
+			old_tween.kill()
 	
-	# Support (légèrement décalé)
-	await get_tree().create_timer(0.1).timeout
+	# Créer un nouveau tween en boucle
+	var tween = unit.sprite_3d.create_tween()
+	tween.set_loops()  # Boucle infinie
 	
-	var tween_support = support.create_tween()
-	tween_support.set_parallel(true)
-	tween_support.tween_property(support, "scale", Vector3.ONE * scale_factor, duration / 2).set_ease(Tween.EASE_OUT)
-	tween_support.tween_property(support, "position:y", support_initial_y + 0.5, duration / 2).set_ease(Tween.EASE_OUT)
-	tween_support.set_parallel(false)
-	tween_support.tween_property(support, "scale", Vector3.ONE, duration / 2).set_ease(Tween.EASE_IN)
-	tween_support.tween_property(support, "position:y", support_initial_y, duration / 2).set_ease(Tween.EASE_IN)
+	# Clignotement : alpha 1.0 → 0.3 → 1.0
+	tween.tween_property(unit.sprite_3d, "modulate:a", 0.3, 0.8).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(unit.sprite_3d, "modulate:a", 1.0, 0.8).set_ease(Tween.EASE_IN_OUT)
 	
-	# ✅ AJOUT : Forcer la position finale
-	tween_support.finished.connect(func():
-		support.position.y = support_initial_y
-		support.scale = Vector3.ONE
-	)
+	# Stocker la référence pour pouvoir l'arrêter
+	unit.set_meta("blink_tween", tween)
+
+# ✅ NOUVELLE FONCTION
+func _stop_blink_effect(unit: BattleUnit3D) -> void:
+	"""Arrête le clignotement et restaure l'opacité normale"""
 	
-	# Effet visuel supplémentaire
-	if leader.sprite_3d:
-		var sprite_tween = leader.sprite_3d.create_tween()
-		sprite_tween.tween_property(leader.sprite_3d, "modulate", Color(1, 1, 0.5), 0.2)
-		sprite_tween.tween_property(leader.sprite_3d, "modulate", Color.WHITE, 0.2)
+	if not unit or not unit.sprite_3d:
+		return
 	
-	if support.sprite_3d:
-		var sprite_tween2 = support.sprite_3d.create_tween()
-		sprite_tween2.tween_property(support.sprite_3d, "modulate", Color(0.5, 1, 1), 0.2)
-		sprite_tween2.tween_property(support.sprite_3d, "modulate", Color.WHITE, 0.2)
+	# Arrêter le tween
+	if unit.has_meta("blink_tween"):
+		var tween = unit.get_meta("blink_tween") as Tween
+		if tween and tween.is_valid():
+			tween.kill()
+		unit.remove_meta("blink_tween")
+	
+	# Restaurer l'opacité normale
+	unit.sprite_3d.modulate.a = 1.0
 
 func _on_duo_option_hovered(partner: BattleUnit3D) -> void:
 	"""Mise à jour de la carte Support au survol"""
