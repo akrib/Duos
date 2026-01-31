@@ -1,6 +1,6 @@
 extends Node3D
 ## BattleMapManager3D - Gestionnaire principal du combat en 3D
-## VERSION OPTIMISÉE : Transitions de tour + Zoom + GlobalLogger
+## VERSION OPTIMISÉE : Transitions de tour + Zoom + Rosace de caméra 8 directions
 
 class_name BattleMapManager3D
 
@@ -35,6 +35,17 @@ enum ActionState {
 	EXECUTING_ACTION
 }
 
+enum CompassDirection {
+	NORTH = 0,      # 0°
+	NORTH_EAST = 45,   # 45°
+	EAST = 90,      # 90°
+	SOUTH_EAST = 135,  # 135°
+	SOUTH = 180,    # 180°
+	SOUTH_WEST = 225,  # 225°
+	WEST = 270,     # 270°
+	NORTH_WEST = 315   # 315°
+}
+
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
@@ -44,7 +55,7 @@ const GRID_WIDTH: int = 20
 const GRID_HEIGHT: int = 15
 
 # Configuration caméra
-const CAMERA_ROTATION_SPEED: float = 90.0
+const CAMERA_ROTATION_SPEED: float = 135.0  # Rotation plus rapide pour 45°
 const CAMERA_DISTANCE: float = 15.0
 const CAMERA_HEIGHT: float = 12.0
 const CAMERA_ANGLE: float = 45.0
@@ -103,7 +114,17 @@ const CHARACTER_MINI_CARD_SCENE = preload("res://scenes/ui/character_mini_card.t
 
 # Boutons de contrôle
 @onready var end_turn_button: Button = $UILayer/BattleUI/BottomBar/MarginContainer/HBoxContainer/ButtonsContainer/EndTurnButton
-@onready var undo_button: Button = $UILayer/BattleUI/BottomBar/MarginContainer/HBoxContainer/ButtonsContainer/UndoButton
+
+# Rosace de caméra
+@onready var compass_n: Button = $UILayer/BattleUI/BottomBar/MarginContainer/HBoxContainer/CameraCompass/NButton
+@onready var compass_ne: Button = $UILayer/BattleUI/BottomBar/MarginContainer/HBoxContainer/CameraCompass/NEButton
+@onready var compass_e: Button = $UILayer/BattleUI/BottomBar/MarginContainer/HBoxContainer/CameraCompass/EButton
+@onready var compass_se: Button = $UILayer/BattleUI/BottomBar/MarginContainer/HBoxContainer/CameraCompass/SEButton
+@onready var compass_s: Button = $UILayer/BattleUI/BottomBar/MarginContainer/HBoxContainer/CameraCompass/SButton
+@onready var compass_sw: Button = $UILayer/BattleUI/BottomBar/MarginContainer/HBoxContainer/CameraCompass/SWButton
+@onready var compass_w: Button = $UILayer/BattleUI/BottomBar/MarginContainer/HBoxContainer/CameraCompass/WButton
+@onready var compass_nw: Button = $UILayer/BattleUI/BottomBar/MarginContainer/HBoxContainer/CameraCompass/NWButton
+@onready var compass_center: Button = $UILayer/BattleUI/BottomBar/MarginContainer/HBoxContainer/CameraCompass/CenterButton
 
 # Dialogue
 @onready var dialogue_box: DialogueBox = $UILayer/DialogueBox
@@ -121,7 +142,6 @@ var stats_tracker: BattleStatsTracker
 var ai_module: AIModule3D
 var json_scenario_module: JSONScenarioModule
 var battle_state_machine: BattleStateMachine
-var command_history: CommandHistory
 var duo_system: DuoSystem
 var ring_system: RingSystem
 var data_validation: DataValidationModule
@@ -271,6 +291,43 @@ func _handle_camera_zoom(direction: float) -> void:
 	GlobalLogger.debug("BATTLE", "Zoom caméra : %.1f" % camera_zoom_distance)
 
 # ============================================================================
+# ROSACE DE CAMÉRA
+# ============================================================================
+
+func _connect_compass_buttons() -> void:
+	"""Connecte les boutons de la rosace de caméra"""
+	
+	compass_n.pressed.connect(func(): set_camera_direction(CompassDirection.NORTH))
+	compass_ne.pressed.connect(func(): set_camera_direction(CompassDirection.NORTH_EAST))
+	compass_e.pressed.connect(func(): set_camera_direction(CompassDirection.EAST))
+	compass_se.pressed.connect(func(): set_camera_direction(CompassDirection.SOUTH_EAST))
+	compass_s.pressed.connect(func(): set_camera_direction(CompassDirection.SOUTH))
+	compass_sw.pressed.connect(func(): set_camera_direction(CompassDirection.SOUTH_WEST))
+	compass_w.pressed.connect(func(): set_camera_direction(CompassDirection.WEST))
+	compass_nw.pressed.connect(func(): set_camera_direction(CompassDirection.NORTH_WEST))
+	compass_center.pressed.connect(_on_center_camera)
+	
+	GlobalLogger.debug("BATTLE", "Boutons de la rosace connectés")
+
+func set_camera_direction(direction: CompassDirection) -> void:
+	"""Positionne la caméra selon une direction cardinale"""
+	
+	camera_rotation_target = float(direction)
+	is_camera_rotating = true
+	
+	GlobalLogger.debug("BATTLE", "Caméra orientée vers : %d°" % direction)
+
+func _on_center_camera() -> void:
+	"""Centre la caméra sur le centre du combat"""
+	
+	battle_center = _calculate_battle_center()
+	
+	var tween = create_tween()
+	tween.tween_property(camera_rig, "position", battle_center, 0.5).set_ease(Tween.EASE_IN_OUT)
+	
+	GlobalLogger.debug("BATTLE", "Caméra centrée")
+
+# ============================================================================
 # INITIALISATION
 # ============================================================================
 
@@ -279,11 +336,9 @@ func _ready() -> void:
 	battle_state_machine.debug_mode = true
 	add_child(battle_state_machine)
 	
-	command_history = CommandHistory.new()
-	add_child(command_history)
-	
 	_setup_camera()
 	_connect_ui_buttons()
+	_connect_compass_buttons()
 	_create_transition_overlay()
 	
 	GlobalLogger.info("BATTLE", "BattleMapManager3D initialisé")
@@ -335,7 +390,6 @@ func _connect_ui_buttons() -> void:
 	
 	# Boutons de contrôle
 	end_turn_button.pressed.connect(_on_end_turn_pressed)
-	undo_button.pressed.connect(_on_undo_pressed)
 
 func initialize_battle(data: Dictionary) -> void:
 	if is_battle_active:
@@ -618,11 +672,11 @@ func _input(event: InputEvent) -> void:
 	if not is_battle_active or battle_state_machine.current_state != "PLAYER_TURN":
 		return
 	
-	# Rotation de la caméra
+	# ✅ MODIFICATION : Rotation de 45° au lieu de 90°
 	if event.is_action_pressed("ui_home"):
-		rotate_camera(-90)
+		rotate_camera(-45)
 	elif event.is_action_pressed("ui_end"):
-		rotate_camera(90)
+		rotate_camera(45)
 	
 	# Clic souris
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -686,20 +740,19 @@ func _handle_terrain_click(grid_pos: Vector2i) -> void:
 	
 	if current_action_state == ActionState.SHOWING_MOVE:
 		if movement_module.can_move_to(selected_unit, grid_pos):
-			# Déplacement valide
-			var cmd = MoveUnitCommand.new(selected_unit, grid_pos, unit_manager)
-			command_history.execute_command(cmd)
+			# Déplacement valide - plus de système d'undo
+			await movement_module.move_unit(selected_unit, grid_pos)
 			selected_unit.movement_used = true
 			_close_all_menus()
 			_deselect_unit()
 		else:
-			# ✅ NOUVEAU : Clic hors portée de déplacement -> annuler
+			# Clic hors portée de déplacement -> annuler
 			GlobalLogger.debug("BATTLE", "Clic hors portée de déplacement - annulation")
 			_close_all_menus()
 			_deselect_unit()
 	
 	elif current_action_state == ActionState.SHOWING_ATTACK:
-		# ✅ NOUVEAU : Vérifier si la position cliquée est dans la portée d'attaque
+		# Vérifier si la position cliquée est dans la portée d'attaque
 		var attack_positions = action_module.get_attack_positions(selected_unit)
 		
 		if grid_pos not in attack_positions:
@@ -920,7 +973,6 @@ func _open_duo_selection_menu() -> void:
 			if ally == selected_unit:
 				continue
 			
-			# ✅ NOUVEAU : Vérifier que l'allié peut encore agir
 			if not ally.can_act():
 				continue
 			
@@ -1302,10 +1354,6 @@ func _is_cardinal_adjacent(pos_a: Vector2i, pos_b: Vector2i) -> bool:
 func _on_battle_state_changed(from: String, to: String) -> void:
 	GlobalLogger.debug("BATTLE", "État : %s → %s" % [from, to])
 	phase_label.text = "Phase: " + to
-
-func _on_undo_pressed() -> void:
-	if command_history.can_undo():
-		command_history.undo()
 
 func _exit_tree() -> void:
 	EventBus.disconnect_all(self)
