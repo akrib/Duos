@@ -44,6 +44,7 @@ const AURA_BASE_RADIUS := 0.4
 const AURA_RADIUS_STEP := 0.15
 const AURA_ALPHA_MIN := 0.15
 const AURA_ALPHA_MAX := 0.45
+const DUO_AURA_LIFETIME := 2.0
 
 
 # Couleurs du torus
@@ -170,7 +171,6 @@ func _create_visuals_3d() -> void:
 	sprite_3d.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_load_sprite_texture()
 	add_child(sprite_3d)
-	
 	# 3. INDICATEUR DE SÉLECTION (torus)
 	selection_indicator = _create_selection_ring()
 	selection_indicator.visible = true
@@ -859,158 +859,146 @@ func _exit_tree() -> void:
 	GlobalLogger.debug("BATTLE_UNIT", "Unité %s nettoyée" % unit_name)
 
 func show_duo_aura(is_enemy_duo: bool = false) -> void:
-	"""Affiche une aura cylindrique avec dégradé vertical"""
-	
 	if not sprite_3d:
 		return
-	
-	# Créer un cylindre pour l'aura
-	var aura = MeshInstance3D.new()
-	aura.name = "DuoAura"
-	
-	# Mesh cylindrique
-	var cylinder = CylinderMesh.new()
-	
-	cylinder.top_radius = 0.6  # Rayon réduit
-	cylinder.bottom_radius = 0.6
-	cylinder.height = 2.5 
-	cylinder.radial_segments = 32
-	cylinder.rings = 8  # Pour un meilleur dégradé
-	
-	aura.mesh = cylinder
-	
-	# Position : centré au sol, monte jusqu'à mi-hauteur
-	aura.position.y = 0
-	
-	# Material avec dégradé vertical
-	var material = StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	material.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
-	material.no_depth_test = false # optionnel
-		
-	# Couleur selon le type de duo
-	var base_color = Color(1.0, 0.2, 0.2, 0.6) if is_enemy_duo else Color(0.2, 0.6, 1.0, 0.6)
-	
-	# Créer un gradient texture pour le dégradé vertical
-	var gradient_texture = _create_vertical_gradient_texture(base_color)
-	material.albedo_texture = gradient_texture
-	material.albedo_color = Color.WHITE
-	
-	material.emission_enabled = true
-	material.emission = base_color * 0.5
-	material.emission_texture = gradient_texture
-	
-	aura.set_surface_override_material(0, material)
-	aura.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	
-	add_child(aura)
-	_create_conic_petals_aura(aura, base_color)
-	# Animation de l'aura (pulse doux)
-	var tween = aura.create_tween()
-	tween.set_loops()
-	
-	# Fade in
-	tween.tween_property(material, "albedo_color:a", 0.8, 0.3)
-	# Pulse scale légèrement
-	tween.tween_property(aura, "scale", Vector3(1.1, 1.0, 1.1), 0.8).set_ease(Tween.EASE_IN_OUT)
-	tween.tween_property(aura, "scale", Vector3(1.0, 1.0, 1.0), 0.8).set_ease(Tween.EASE_IN_OUT)
-	
-	# Stocker la référence pour suppression
-	set_meta("duo_aura", aura)
-	set_meta("duo_aura_tween", tween)
-	
-func _create_vertical_gradient_texture(base_color: Color) -> ImageTexture:
-	"""Crée une texture avec dégradé vertical (transparent en bas, opaque en haut)"""
-	
-	var size = 256
-	var image = Image.create(size, size, false, Image.FORMAT_RGBA8)
-	
-	for y in range(size):
-		# Gradient vertical : 0.0 en bas (y=255) → 1.0 en haut (y=0)
-		var gradient_factor = 1.0 - (float(y) / float(size))
-		
-		# Alpha augmente du bas vers le haut
-		var alpha = gradient_factor * base_color.a
-		
-		# Couleur avec alpha graduel
-		var pixel_color = Color(base_color.r, base_color.g, base_color.b, alpha)
-		
-		for x in range(size):
-			image.set_pixel(x, y, pixel_color)
-	
-	return ImageTexture.create_from_image(image)
-	
-	
-func hide_duo_aura() -> void:
-	"""Supprime l'aura de duo"""
-	
+
+	# Supprimer ancienne aura proprement
 	if has_meta("duo_aura"):
-		var aura = get_meta("duo_aura") as Sprite3D
-		
-		if aura and is_instance_valid(aura):
-			var fade_tween = aura.create_tween()
-			fade_tween.tween_property(aura, "modulate:a", 0.0, 0.3)
-			fade_tween.tween_callback(aura.queue_free)
-		
+		var old_aura := get_meta("duo_aura") as Node3D
+		if old_aura and is_instance_valid(old_aura):
+			_fade_and_destroy_duo_aura(old_aura)
 		remove_meta("duo_aura")
-	
-	if has_meta("duo_aura_tween"):
-		var tween = get_meta("duo_aura_tween") as Tween
-		if tween and tween.is_valid():
-			tween.kill()
-		remove_meta("duo_aura_tween")
-		
-		
+
+	var aura := Node3D.new()
+	aura.name = "DuoAura"
+	add_child(aura)
+	set_meta("duo_aura", aura)
+
+	var base_color := Color(1.0, 0.25, 0.25) if is_enemy_duo else Color(0.25, 0.6, 1.0)
+
+	var beam_count := 14
+	var radius := 0.65
+	var height := 1.6
+
+	for i in range(beam_count):
+		var beam := MeshInstance3D.new()
+
+		var mesh := CylinderMesh.new()
+		mesh.top_radius = 0.05
+		mesh.bottom_radius = 0.05
+		mesh.height = height * randf_range(0.85, 1.1)
+		mesh.radial_segments = 12
+		beam.mesh = mesh
+		beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+		# Placement radial
+		var angle := TAU * float(i) / beam_count
+		beam.position = Vector3(
+			cos(angle) * radius,
+			mesh.height * 0.5,
+			sin(angle) * radius
+		)
+
+		# Désordre léger à la base (fontaine)
+		beam.position.x += randf_range(-0.05, 0.05)
+		beam.position.z += randf_range(-0.05, 0.05)
+
+		# Orientation
+		beam.rotation.y = angle
+
+		# Inclinaison locale type fontaine
+		var tilt_strength := 0.25
+		beam.rotate_object_local(Vector3.RIGHT, randf_range(-tilt_strength, tilt_strength))
+		beam.rotate_object_local(Vector3.FORWARD, randf_range(-tilt_strength, tilt_strength))
+
+		# Matériau
+		var mat := ShaderMaterial.new()
+		mat.shader = preload("res://asset/shader/aura_ring.gdshader")
+		mat.set_shader_parameter("base_color", base_color)
+		mat.set_shader_parameter("time_offset", randf() * 6.0)
+		mat.set_shader_parameter("alpha_multiplier", 0.0)
+		beam.material_override = mat
+
+		aura.add_child(beam)
+
+		# Fade-in progressif
+		var fade := aura.create_tween()
+		fade.tween_property(
+			mat,
+			"shader_parameter/alpha_multiplier",
+			1.0,
+			0.3
+		).set_delay(i * 0.025).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+		# Sway lent (vivant mais stable)
+		var sway := beam.create_tween()
+		sway.set_loops()
+		sway.tween_property(
+			beam,
+			"rotation:x",
+			beam.rotation.x + randf_range(-0.05, 0.05),
+			randf_range(1.8, 2.8)
+		).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+		sway.tween_property(
+			beam,
+			"rotation:z",
+			beam.rotation.z + randf_range(-0.05, 0.05),
+			randf_range(1.8, 2.8)
+		).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+	# Pulsation globale douce
+	var pulse := aura.create_tween()
+	pulse.set_loops()
+	pulse.tween_property(aura, "scale", Vector3(1.05, 1.0, 1.05), 0.9)
+	pulse.tween_property(aura, "scale", Vector3.ONE, 0.9)
+
+	# Rotation lente globale
+	var rot := aura.create_tween()
+	rot.set_loops()
+	rot.tween_property(aura, "rotation:y", TAU, 5.0)
+
+	# Auto destruction
+	await get_tree().create_timer(DUO_AURA_LIFETIME).timeout
+
+	if is_instance_valid(aura):
+		_fade_and_destroy_duo_aura(aura)
+
+func _fade_and_destroy_duo_aura(aura: Node3D) -> void:
+	if not aura or not is_instance_valid(aura):
+		return
+
+	var t := aura.create_tween()
+	t.tween_property(aura, "scale", Vector3.ZERO, 0.25)\
+		.set_trans(Tween.TRANS_SINE)\
+		.set_ease(Tween.EASE_IN)
+
+	t.tween_callback(func():
+		if is_instance_valid(aura):
+			aura.queue_free()
+	)
 
 
+func _create_vertical_gradient_texture(base_color: Color) -> Texture2D:
+	var gradient := Gradient.new()
+	gradient.add_point(0.0, Color(base_color.r, base_color.g, base_color.b, 0.0))
+	gradient.add_point(0.15, Color(base_color.r, base_color.g, base_color.b, base_color.a))
+	gradient.add_point(0.85, Color(base_color.r, base_color.g, base_color.b, base_color.a))
+	gradient.add_point(1.0, Color(base_color.r, base_color.g, base_color.b, 0.0))
 
-		
-func _create_conic_petals_aura(parent: Node3D, base_color: Color) -> void:
-	"""
-	Crée plusieurs cônes translucides formant une aura en rose
-	"""
-	
-	for i in range(AURA_PETAL_COUNT):
-		var petal := MeshInstance3D.new()
-		petal.name = "AuraPetal_%d" % i
-		
-		var t := float(i) / float(AURA_PETAL_COUNT - 1) # 0 → 1
-		
-		# --- Mesh conique ---
-		var cone := CylinderMesh.new()
-		cone.height = AURA_HEIGHT / t
-		cone.bottom_radius = AURA_BASE_RADIUS * 0.4
-		cone.top_radius = AURA_BASE_RADIUS + AURA_RADIUS_STEP * i
-		cone.radial_segments = 24
-		cone.rings = 8
-		
-		petal.mesh = cone
-		
-		# --- Position ---
-		petal.position.y = 0
-		
-		# Légère rotation pour effet "rose"
-		petal.rotation.y = deg_to_rad((360.0 / AURA_PETAL_COUNT) * i)
-		
-		# --- Matériau ---
-		var mat := StandardMaterial3D.new()
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
-		mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-		
-		# Plus le cône est large, plus il est clair
-		var alpha: float = lerp(AURA_ALPHA_MIN, AURA_ALPHA_MAX, t)
-		var color: Color = base_color.lightened(t * 0.4)
-		color.a = alpha
+	var texture := GradientTexture2D.new()
+	texture.gradient = gradient
+	texture.width = 1
+	texture.height = 256
 
-		mat.albedo_color = color
-		mat.emission_enabled = true
-		mat.emission = color * 0.6
-		
-		petal.set_surface_override_material(0, mat)
-		petal.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		
-		parent.add_child(petal)
+	return texture
+
+func hide_duo_aura() -> void:
+	if not has_meta("duo_aura"):
+		return
+
+	var aura := get_meta("duo_aura") as Node3D
+	if aura and is_instance_valid(aura):
+		_fade_and_destroy_duo_aura(aura)
+
+	remove_meta("duo_aura")
