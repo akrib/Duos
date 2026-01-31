@@ -1,6 +1,6 @@
 extends Node3D
 ## BattleMapManager3D - Gestionnaire principal du combat en 3D
-## VERSION OPTIMISÉE : Transitions de tour + Zoom + Rosace de caméra 8 directions
+## VERSION COMPLÈTE : Transitions + Zoom + Rosace + Repos intégré au déplacement
 
 class_name BattleMapManager3D
 
@@ -32,18 +32,19 @@ enum ActionState {
 	CHOOSING_DUO,
 	SHOWING_MOVE,
 	SHOWING_ATTACK,
-	EXECUTING_ACTION
+	EXECUTING_ACTION,
+	USING_REST  # ✅ NOUVEAU : État pour l'utilisation du repos
 }
 
 enum CompassDirection {
-	NORTH = 0,      # 0°
-	NORTH_EAST = 45,   # 45°
-	EAST = 90,      # 90°
-	SOUTH_EAST = 135,  # 135°
-	SOUTH = 180,    # 180°
-	SOUTH_WEST = 225,  # 225°
-	WEST = 270,     # 270°
-	NORTH_WEST = 315   # 315°
+	NORTH = 0,
+	NORTH_EAST = 45,
+	EAST = 90,
+	SOUTH_EAST = 135,
+	SOUTH = 180,
+	SOUTH_WEST = 225,
+	WEST = 270,
+	NORTH_WEST = 315
 }
 
 # ============================================================================
@@ -55,7 +56,7 @@ const GRID_WIDTH: int = 20
 const GRID_HEIGHT: int = 15
 
 # Configuration caméra
-const CAMERA_ROTATION_SPEED: float = 135.0  # Rotation plus rapide pour 45°
+const CAMERA_ROTATION_SPEED: float = 135.0
 const CAMERA_DISTANCE: float = 15.0
 const CAMERA_HEIGHT: float = 12.0
 const CAMERA_ANGLE: float = 45.0
@@ -145,6 +146,7 @@ var battle_state_machine: BattleStateMachine
 var duo_system: DuoSystem
 var ring_system: RingSystem
 var data_validation: DataValidationModule
+var rest_module: RestModule  # ✅ Module de repos
 
 # ============================================================================
 # ÉTAT
@@ -189,21 +191,18 @@ func _create_transition_overlay() -> void:
 	transition_overlay.layer = 100
 	add_child(transition_overlay)
 	
-	# Panel d'assombrissement (transparent aux clics)
 	transition_panel = ColorRect.new()
 	transition_panel.color = Color(0, 0, 0, 0)
 	transition_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	transition_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 	transition_overlay.add_child(transition_panel)
 	
-	# Label du message
 	transition_label = Label.new()
 	transition_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	transition_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	transition_label.set_anchors_preset(Control.PRESET_CENTER)
 	transition_label.pivot_offset = transition_label.size / 2
 	
-	# Style du texte
 	transition_label.add_theme_font_size_override("font_size", 120)
 	transition_label.add_theme_color_override("font_color", Color.WHITE)
 	transition_label.add_theme_color_override("font_outline_color", Color.BLACK)
@@ -246,18 +245,15 @@ func _play_turn_transition(turn_number: int, is_player_turn: bool) -> void:
 	var tween = create_tween()
 	tween.set_parallel(false)
 	
-	# Assombrissement + entrée (0.5s)
 	tween.set_parallel(true)
 	tween.tween_property(transition_panel, "color:a", 0.9, 0.5).set_ease(Tween.EASE_IN)
 	tween.tween_property(transition_label, "position:x", screen_size.x / 2 - transition_label.size.x / 2, 0.5).set_ease(Tween.EASE_OUT)
 	tween.set_parallel(false)
 	
-	# Pause + déplacement caméra (2s)
 	tween.tween_interval(0.5)
 	tween.tween_method(_move_camera_to_position, camera_rig.position, battle_center, 1.0).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_CUBIC)
 	tween.tween_interval(0.5)
 	
-	# Sortie + éclaircissement (0.5s)
 	tween.set_parallel(true)
 	tween.tween_property(transition_label, "position:x", screen_size.x, 0.5).set_ease(Tween.EASE_IN)
 	tween.tween_property(transition_panel, "color:a", 0.0, 0.5).set_ease(Tween.EASE_OUT)
@@ -469,6 +465,12 @@ func _initialize_modules() -> void:
 	ai_module.duo_system = duo_system
 	add_child(ai_module)
 	
+	# ✅ Module de repos
+	rest_module = RestModule.new()
+	add_child(rest_module)
+	rest_module.reset_for_new_battle()
+	rest_module.rest_points_changed.connect(_on_rest_points_changed)
+	
 	_connect_modules()
 	await get_tree().process_frame
 	
@@ -672,7 +674,6 @@ func _input(event: InputEvent) -> void:
 	if not is_battle_active or battle_state_machine.current_state != "PLAYER_TURN":
 		return
 	
-	# ✅ MODIFICATION : Rotation de 45° au lieu de 90°
 	if event.is_action_pressed("ui_home"):
 		rotate_camera(-45)
 	elif event.is_action_pressed("ui_end"):
@@ -738,25 +739,29 @@ func _handle_terrain_click(grid_pos: Vector2i) -> void:
 	if not selected_unit:
 		return
 	
-	if current_action_state == ActionState.SHOWING_MOVE:
+	if current_action_state == ActionState.SHOWING_MOVE or current_action_state == ActionState.USING_REST:
 		if movement_module.can_move_to(selected_unit, grid_pos):
-			# Déplacement valide - plus de système d'undo
+			# Déplacement valide
 			await movement_module.move_unit(selected_unit, grid_pos)
+			
+			# ✅ Si on était en mode repos, consommer le point
+			if current_action_state == ActionState.USING_REST:
+				# Le point de repos a déjà été consommé avant le déplacement
+				GlobalLogger.debug("BATTLE", "Déplacement avec repos terminé")
+			
 			selected_unit.movement_used = true
 			_close_all_menus()
 			_deselect_unit()
 		else:
-			# Clic hors portée de déplacement -> annuler
+			# Clic hors portée -> annuler
 			GlobalLogger.debug("BATTLE", "Clic hors portée de déplacement - annulation")
 			_close_all_menus()
 			_deselect_unit()
 	
 	elif current_action_state == ActionState.SHOWING_ATTACK:
-		# Vérifier si la position cliquée est dans la portée d'attaque
 		var attack_positions = action_module.get_attack_positions(selected_unit)
 		
 		if grid_pos not in attack_positions:
-			# Clic hors portée d'attaque -> annuler
 			GlobalLogger.debug("BATTLE", "Clic hors portée d'attaque - annulation")
 			_close_all_menus()
 			_deselect_unit()
@@ -880,7 +885,23 @@ func _open_action_menu() -> void:
 	var screen_pos = camera.unproject_position(selected_unit.position)
 	action_popup.position = screen_pos + Vector2(50, -100)
 	
-	move_button.disabled = not selected_unit.can_move()
+	# ✅ Logique du bouton Déplacer avec repos
+	var can_use_rest = rest_module.can_use_rest(selected_unit)
+	var has_moved = selected_unit.movement_used
+	
+	if has_moved and can_use_rest:
+		# L'unité s'est déjà déplacée, proposer le repos
+		move_button.text = "🏃 Repos (%d/2)" % rest_module.get_rest_points(selected_unit.is_player_unit)
+		move_button.disabled = false
+	elif not has_moved:
+		# Déplacement normal
+		move_button.text = "👣 Déplacer"
+		move_button.disabled = not selected_unit.can_move()
+	else:
+		# Déjà bougé et pas de repos
+		move_button.text = "👣 Déplacer"
+		move_button.disabled = true
+	
 	attack_button.disabled = not selected_unit.can_act()
 	defend_button.disabled = not selected_unit.can_act()
 	abilities_button.disabled = not selected_unit.can_act() or selected_unit.abilities.is_empty()
@@ -897,16 +918,48 @@ func _close_all_menus() -> void:
 # ============================================================================
 
 func _on_move_pressed() -> void:
-	if not selected_unit or not selected_unit.can_move():
+	if not selected_unit:
 		return
 	
-	action_popup.hide()
-	current_action_state = ActionState.SHOWING_MOVE
+	# ✅ Vérifier si on est en mode repos
+	if selected_unit.movement_used and rest_module.can_use_rest(selected_unit):
+		# Mode repos : consommer le point AVANT de montrer la zone
+		if not rest_module.use_rest_point(selected_unit):
+			EventBus.notify("❌ Impossible d'utiliser le repos", "error")
+			return
+		
+		EventBus.notify("✨ Repos utilisé : +1 case de déplacement", "success")
+		
+		action_popup.hide()
+		current_action_state = ActionState.USING_REST
+		
+		# Calculer positions accessibles (1 case uniquement)
+		var reachable = movement_module.calculate_single_step_positions(selected_unit)
+		
+		if reachable.is_empty():
+			EventBus.notify("⚠️ Aucune case accessible", "warning")
+			terrain_module.clear_all_highlights()
+			current_action_state = ActionState.IDLE
+			return
+		
+		terrain_module.highlight_tiles(reachable, MOVEMENT_COLOR)
+		GlobalLogger.info("BATTLE", "%s utilise le repos : %d case(s) accessible(s)" % [
+			selected_unit.unit_name,
+			reachable.size()
+		])
 	
-	var reachable = movement_module.calculate_reachable_positions(selected_unit)
-	terrain_module.highlight_tiles(reachable, MOVEMENT_COLOR)
-	
-	GlobalLogger.debug("BATTLE", "Mode déplacement activé")
+	else:
+		# Déplacement normal
+		if not selected_unit.can_move():
+			return
+		
+		action_popup.hide()
+		current_action_state = ActionState.SHOWING_MOVE
+		
+		var reachable = movement_module.calculate_reachable_positions(selected_unit)
+		terrain_module.highlight_tiles(reachable, MOVEMENT_COLOR)
+		
+		GlobalLogger.debug("BATTLE", "Mode déplacement activé")
 
 func _on_attack_pressed() -> void:
 	if not selected_unit or not selected_unit.can_act():
@@ -1028,7 +1081,6 @@ func _open_duo_selection_menu() -> void:
 	duo_popup.popup()
 	
 	current_action_state = ActionState.CHOOSING_DUO
-
 
 func _setup_duo_popup_transparency() -> void:
 	if not duo_popup.has_theme_stylebox_override("panel"):
@@ -1218,23 +1270,19 @@ func _end_battle(victory: bool) -> void:
 		change_phase(TurnPhase.CUTSCENE)
 		await json_scenario_module.play_outro(victory)
 	
-	# Récupérer les stats de combat
 	var battle_stats = stats_tracker.get_final_stats()
 	
-	# Calculer l'XP gagné
 	var xp_earned = 0
 	if victory:
 		var global_stats = battle_stats.get("global", {})
 		var turns = global_stats.get("turns_elapsed", 1)
 		var enemies_killed = global_stats.get("units_killed", 0)
 		
-		# Formule : 50 XP de base + 10 par ennemi + bonus rapidité
 		xp_earned = 50 + (enemies_killed * 10)
 		
 		if turns < 10:
-			xp_earned += 50  # Bonus victoire rapide
+			xp_earned += 50
 	
-	# Construire les résultats avec toutes les infos nécessaires
 	var results = {
 		"victory": victory,
 		"battle_title": battle_data.get("battle_title", "Combat Tactique"),
@@ -1253,12 +1301,10 @@ func _end_battle(victory: bool) -> void:
 	else:
 		EventBus.notify("Défaite...", "error")
 	
-	# Stocker les résultats pour l'écran de résultats
 	BattleDataManager.store_battle_results(results)
 	
 	await get_tree().create_timer(2.0).timeout
 	
-	# Aller à l'écran de résultats
 	EventBus.change_scene(SceneRegistry.SceneID.BATTLE_RESULTS)
 
 func _award_xp_to_survivors() -> void:
@@ -1297,6 +1343,18 @@ func _on_duo_broken(duo_id: String) -> void:
 
 func _on_duo_validation_failed(reason: String) -> void:
 	EventBus.notify("Formation de duo impossible : " + reason, "warning")
+
+# ============================================================================
+# CALLBACKS REPOS
+# ============================================================================
+
+func _on_rest_points_changed(is_player: bool, new_value: int) -> void:
+	"""Callback quand les points de repos changent"""
+	
+	GlobalLogger.debug("BATTLE", "Repos %s : %d/2" % [
+		"Joueur" if is_player else "Ennemi",
+		new_value
+	])
 
 # ============================================================================
 # UTILITAIRES
@@ -1358,7 +1416,6 @@ func _on_battle_state_changed(from: String, to: String) -> void:
 func _exit_tree() -> void:
 	EventBus.disconnect_all(self)
 	GlobalLogger.info("BATTLE", "BattleMapManager3D nettoyé")
-
 
 func store_battle_results(results: Dictionary) -> void:
 	"""Stocke les résultats du combat pour l'écran de résultats"""

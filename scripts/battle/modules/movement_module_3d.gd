@@ -169,3 +169,62 @@ func _reconstruct_path(came_from: Dictionary, current: Vector2i) -> Array:
 		current = came_from[current]
 		path.insert(0, current)
 	return path
+
+# ============================================================================
+# REPOS : DÉPLACEMENT D'UNE CASE (NOUVEAU - AJOUTER)
+# ============================================================================
+
+func calculate_single_step_positions(unit: BattleUnit3D) -> Array[Vector2i]:
+	"""
+	Calcule les positions accessibles à exactement 1 case de distance
+	Utilisé pour le système de repos (inertie)
+	
+	@param unit : Unité qui utilise le repos
+	@return Array de positions accessibles en 1 déplacement
+	"""
+	
+	if not unit:
+		GlobalLogger.warning("MOVEMENT_MODULE", "calculate_single_step_positions : unité nulle")
+		return []
+	
+	var positions: Array[Vector2i] = []
+	
+	# Les 4 directions cardinales
+	var directions = [
+		Vector2i(1, 0),   # Droite
+		Vector2i(-1, 0),  # Gauche
+		Vector2i(0, 1),   # Bas
+		Vector2i(0, -1)   # Haut
+	]
+	
+	for dir in directions:
+		var neighbor = unit.grid_position + dir
+		
+		# Vérifier les limites de la carte
+		if not terrain.is_in_bounds(neighbor):
+			continue
+		
+		# Vérifier si la case est marchable
+		if not terrain.is_walkable(neighbor):
+			continue
+		
+		# Vérifier le coût de déplacement (doit être ≤ 1)
+		var move_cost = terrain.get_movement_cost(neighbor)
+		if move_cost > 1.0:
+			GlobalLogger.debug("MOVEMENT_MODULE", "Case %s ignorée (coût: %.1f > 1)" % [neighbor, move_cost])
+			continue
+		
+		# Vérifier que la case n'est pas occupée
+		if unit_manager.is_position_occupied(neighbor):
+			GlobalLogger.debug("MOVEMENT_MODULE", "Case %s occupée" % neighbor)
+			continue
+		
+		# Case valide !
+		positions.append(neighbor)
+	
+	GlobalLogger.debug("MOVEMENT_MODULE", "%s : %d case(s) accessible(s) avec repos" % [
+		unit.unit_name,
+		positions.size()
+	])
+	
+	return positions
