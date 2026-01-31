@@ -32,6 +32,37 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
+[node name="ItemPopup" type="PopupPanel" parent="UILayer/BattleUI"]
+
+[node name="MarginContainer" type="MarginContainer" parent="UILayer/BattleUI/ItemPopup"]
+offset_left = 4.0
+offset_top = 4.0
+offset_right = 96.0
+offset_bottom = 96.0
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 20
+
+[node name="VBoxContainer" type="VBoxContainer" parent="UILayer/BattleUI/ItemPopup/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="TitleLabel" type="Label" parent="UILayer/BattleUI/ItemPopup/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "📦 Objets"
+horizontal_alignment = 1
+
+[node name="ScrollContainer" type="ScrollContainer" parent="UILayer/BattleUI/ItemPopup/MarginContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 400)
+layout_mode = 2
+
+[node name="ItemListContainer" type="VBoxContainer" parent="UILayer/BattleUI/ItemPopup/MarginContainer/VBoxContainer/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
 [node name="TopBar" type="PanelContainer" parent="UILayer/BattleUI"]
 layout_mode = 1
 anchors_preset = 10
@@ -280,8 +311,8 @@ text = "NW"
 [node name="VBoxContainer" type="VBoxContainer" parent="UILayer/BattleUI/ActionPopup"]
 offset_left = 4.0
 offset_top = 4.0
-offset_right = 184.0
-offset_bottom = 344.0
+offset_right = 96.0
+offset_bottom = 96.0
 theme_override_constants/separation = 10
 
 [node name="MoveButton" type="Button" parent="UILayer/BattleUI/ActionPopup/VBoxContainer"]
@@ -404,8 +435,8 @@ text = "--"
 [node name="MarginContainer" type="MarginContainer" parent="UILayer/BattleUI/DuoSelectionPopup"]
 offset_left = 4.0
 offset_top = 4.0
-offset_right = 854.0
-offset_bottom = 234.0
+offset_right = 96.0
+offset_bottom = 96.0
 theme_override_constants/margin_left = 20
 theme_override_constants/margin_top = 20
 theme_override_constants/margin_right = 20

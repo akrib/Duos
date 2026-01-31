@@ -33,7 +33,8 @@ enum ActionState {
 	SHOWING_MOVE,
 	SHOWING_ATTACK,
 	EXECUTING_ACTION,
-	USING_REST  # ✅ NOUVEAU : État pour l'utilisation du repos
+	USING_REST,
+	SELECTING_ITEM_TARGET 
 }
 
 enum CompassDirection {
@@ -129,7 +130,8 @@ const CHARACTER_MINI_CARD_SCENE = preload("res://scenes/ui/character_mini_card.t
 
 # Dialogue
 @onready var dialogue_box: DialogueBox = $UILayer/DialogueBox
-
+@onready var item_popup: PopupPanel  # À créer dans la scène
+@onready var item_list_container: VBoxContainer  # À créer dans la scène
 # ============================================================================
 # MODULES
 # ============================================================================
@@ -147,6 +149,8 @@ var duo_system: DuoSystem
 var ring_system: RingSystem
 var data_validation: DataValidationModule
 var rest_module: RestModule  # ✅ Module de repos
+var last_man_stand_module: LastManStandModule
+var item_module: ItemModule
 
 # ============================================================================
 # ÉTAT
@@ -465,6 +469,36 @@ func _initialize_modules() -> void:
 	ai_module.duo_system = duo_system
 	add_child(ai_module)
 	
+	item_module = ItemModule.new()
+	item_module.terrain = terrain_module
+	item_module.unit_manager = unit_manager
+	item_module.duo_system = duo_system
+	add_child(item_module)
+	
+	# Charger l'inventaire depuis BattleDataManager
+	var inventory = battle_data.get("inventory", {
+		"potion_hp_small": 3,
+		"potion_hp_medium": 2,
+		"antidote": 2,
+		"remedy": 1,
+		"mana_elixir": 2
+	})
+	item_module.setup_inventory(inventory)
+	
+	item_module.item_used.connect(_on_item_used)
+	item_module.item_failed.connect(_on_item_failed)
+	
+	
+	# ✅ Module Last Man Stand
+	last_man_stand_module = LastManStandModule.new()
+	last_man_stand_module.terrain = terrain_module
+	last_man_stand_module.unit_manager = unit_manager
+	add_child(last_man_stand_module)
+	
+	last_man_stand_module.last_man_stand_triggered.connect(_on_last_man_stand_triggered)
+	last_man_stand_module.last_man_stand_completed.connect(_on_last_man_stand_completed)
+
+	
 	# ✅ Module de repos
 	rest_module = RestModule.new()
 	add_child(rest_module)
@@ -734,6 +768,23 @@ func _handle_unit_click(unit: BattleUnit3D) -> void:
 	elif selected_unit and selected_unit.can_act():
 		if current_action_state == ActionState.SHOWING_ATTACK:
 			_attack_unit(selected_unit, unit)
+	# Sélection de cible pour objet
+	if current_action_state == ActionState.SELECTING_ITEM_TARGET:
+		var item_id = get_meta("pending_item_id", "")
+		var item_type = get_meta("pending_item_type", "")
+		
+		match item_type:
+			"ally_single":
+				if unit.is_player_unit:
+					item_module.use_item(selected_unit, item_id, unit)
+					_close_all_menus()
+					_deselect_unit()
+			
+			"enemy_single", "enemy_duo":
+				if not unit.is_player_unit:
+					item_module.use_item(selected_unit, item_id, unit)
+					_close_all_menus()
+					_deselect_unit()
 
 func _handle_terrain_click(grid_pos: Vector2i) -> void:
 	if not selected_unit:
@@ -765,7 +816,15 @@ func _handle_terrain_click(grid_pos: Vector2i) -> void:
 			GlobalLogger.debug("BATTLE", "Clic hors portée d'attaque - annulation")
 			_close_all_menus()
 			_deselect_unit()
-
+			
+	if current_action_state == ActionState.SELECTING_ITEM_TARGET:
+		var item_type = get_meta("pending_item_type", "")
+		
+		if item_type == "position":
+			var item_id = get_meta("pending_item_id", "")
+			item_module.use_item(selected_unit, item_id, grid_pos)
+			_close_all_menus()
+			_deselect_unit()
 # ============================================================================
 # PANEL D'INFORMATION
 # ============================================================================
@@ -972,21 +1031,40 @@ func _on_defend_pressed() -> void:
 	if not selected_unit or not selected_unit.can_act():
 		return
 	
-	GlobalLogger.debug("BATTLE", "Défense activée")
+	GlobalLogger.debug("BATTLE", "%s prend une posture défensive" % selected_unit.unit_name)
+	
+	# ✅ Marquer l'unité comme défendant
 	selected_unit.action_used = true
-	selected_unit.defense_power = int(selected_unit.defense_power * 1.5)
+	selected_unit.movement_used = true
+	
+	# ✅ Appliquer le bonus de défense de 30% (réduction de dégâts)
+	selected_unit.set_meta("is_defending", true)
+	selected_unit.set_meta("defense_bonus", 0.30)  # 30% de réduction
+	
+	# ✅ Effet visuel de défense
+	_play_defend_animation(selected_unit)
+	
+	EventBus.notify("🛡 %s : posture défensive (+30%% résistance)" % selected_unit.unit_name, "info")
+	
 	_close_all_menus()
 	_deselect_unit()
+
+func _play_defend_animation(unit: BattleUnit3D) -> void:
+	"""Affiche une animation de défense"""
+	
+	if not unit or not unit.sprite_3d:
+		return
+	
+	# Effet de bouclier bleu
+	var tween = unit.create_tween()
+	tween.tween_property(unit.sprite_3d, "modulate", Color(0.5, 0.5, 1.5), 0.2)
+	tween.tween_property(unit.sprite_3d, "modulate", Color.WHITE, 0.2)
 
 func _on_abilities_pressed() -> void:
 	if not selected_unit or not selected_unit.can_act():
 		return
 	
 	GlobalLogger.debug("BATTLE", "Capacités (à implémenter)")
-	_close_all_menus()
-
-func _on_items_pressed() -> void:
-	GlobalLogger.debug("BATTLE", "Objets (à implémenter)")
 	_close_all_menus()
 
 func _on_wait_action_pressed() -> void:
@@ -1069,7 +1147,24 @@ func _open_duo_selection_menu() -> void:
 						"weapon_ring": weapon_id
 					})
 			)
-	
+	if is_last_survivor:
+		var lms_check = last_man_stand_module.can_use_last_man_stand(selected_unit)
+		
+		if lms_check.can_use:
+			solo_button_duo.text = "💀 DÉCHAÎNEMENT PROFANE (LMS)"
+			solo_button_duo.modulate = Color(1.5, 0.3, 0.3)  # Rouge intense
+		else:
+			solo_button_duo.text = "❌ Attaque solo impossible"
+			solo_button_duo.disabled = true
+			
+			# Afficher la raison
+			var reason_label = Label.new()
+			reason_label.text = "⚠️ " + lms_check.reason
+			reason_label.add_theme_color_override("font_color", Color(1.0, 0.7, 0.0))
+			duo_options_container.add_child(reason_label)
+	else:
+		solo_button_duo.visible = false
+
 	solo_button_duo.visible = is_last_survivor
 	if is_last_survivor:
 		solo_button_duo.text = "⚔️ Attaquer (Dernier survivant)"
@@ -1174,9 +1269,36 @@ func _select_duo_partner(partner: BattleUnit3D) -> void:
 		EventBus.notify("Impossible de former ce duo", "warning")
 
 func _on_solo_attack_pressed() -> void:
+	"""Gère l'attaque solo - soit Last Man Stand, soit erreur"""
+	
+	if not selected_unit:
+		return
+	
 	duo_popup.hide()
 	duo_partner = null
-	_show_attack_range()
+	
+	# ✅ Vérifier si Last Man Stand est possible
+	var lms_check = last_man_stand_module.can_use_last_man_stand(selected_unit)
+	
+	if lms_check.can_use:
+		# Demander confirmation
+		var confirm_text = "⚠️ DÉCHAÎNEMENT PROFANE ⚠️\n\nVoulez-vous déclencher cette attaque interdite ?\n- Consomme 100%% du mana\n- Frappe toutes les cases adjacentes\n- Acte socialement condamné"
+		
+		# Vous pourriez créer un dialogue de confirmation ici
+		# Pour l'instant, on lance directement
+		
+		await last_man_stand_module.execute_last_man_stand(selected_unit)
+		
+		_close_all_menus()
+		_deselect_unit()
+	else:
+		# Attaque solo impossible
+		EventBus.notify("❌ Attaque solo impossible : %s" % lms_check.reason, "error")
+		GlobalLogger.warning("BATTLE", lms_check.reason)
+		
+		# Réouvrir le menu de sélection
+		_open_action_menu()
+
 
 func _on_cancel_duo_pressed() -> void:
 	duo_popup.hide()
@@ -1421,3 +1543,155 @@ func store_battle_results(results: Dictionary) -> void:
 	"""Stocke les résultats du combat pour l'écran de résultats"""
 	battle_data["results"] = results
 	print("[BattleDataManager] Résultats de combat stockés")
+	
+func _on_last_man_stand_triggered(unit: BattleUnit3D) -> void:
+	"""Callback quand Last Man Stand est déclenché"""
+	GlobalLogger.info("BATTLE", "💀 %s déclenche le Déchaînement Profane" % unit.unit_name)
+
+func _on_last_man_stand_completed(unit: BattleUnit3D, total_damage: int) -> void:
+	"""Callback quand Last Man Stand est terminé"""
+	GlobalLogger.info("BATTLE", "✅ Déchaînement Profane terminé : %d dégâts totaux" % total_damage)
+	
+func _on_items_pressed() -> void:
+	if not selected_unit:
+		return
+	
+	action_popup.hide()
+	_open_item_menu()
+
+func _open_item_menu() -> void:
+	"""Affiche le menu de sélection d'objets"""
+	
+	if not selected_unit:
+		return
+	
+	# Nettoyer la liste
+	for child in item_list_container.get_children():
+		child.queue_free()
+	
+	# Récupérer les objets disponibles
+	var available_items = item_module.get_available_items(selected_unit)
+	
+	if available_items.is_empty():
+		var no_items_label = Label.new()
+		no_items_label.text = "Aucun objet disponible"
+		no_items_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		item_list_container.add_child(no_items_label)
+	else:
+		for item_info in available_items:
+			var item_button = _create_item_button(item_info)
+			item_list_container.add_child(item_button)
+	
+	# Bouton annuler
+	var cancel_btn = Button.new()
+	cancel_btn.text = "✕ Annuler"
+	cancel_btn.custom_minimum_size = Vector2(0, 40)
+	cancel_btn.pressed.connect(_on_item_menu_cancel)
+	item_list_container.add_child(cancel_btn)
+	
+	# Positionner et afficher
+	var screen_size = get_viewport().get_visible_rect().size
+	item_popup.position = Vector2(screen_size.x / 2 - 200, screen_size.y / 2 - 250)
+	item_popup.popup()
+
+func _create_item_button(item_info: Dictionary) -> Button:
+	"""Crée un bouton pour un objet"""
+	
+	var button = Button.new()
+	button.custom_minimum_size = Vector2(380, 60)
+	
+	# Texte du bouton
+	var item_name = item_info.get("name", "Objet")
+	var quantity = item_info.get("quantity", 0)
+	var description = item_info.get("description", "")
+	
+	button.text = "%s (x%d)\n%s" % [item_name, quantity, description]
+	
+	# Coloration selon la rareté
+	var rarity = item_info.get("rarity", ItemModule.ItemRarity.COMMON)
+	match rarity:
+		ItemModule.ItemRarity.COMMON:
+			button.modulate = Color(1.0, 1.0, 1.0)
+		ItemModule.ItemRarity.RARE:
+			button.modulate = Color(0.5, 0.8, 1.5)
+		ItemModule.ItemRarity.VERY_RARE:
+			button.modulate = Color(1.5, 0.5, 1.5)
+	
+	# Connexion
+	var item_id = item_info.get("id", "")
+	button.pressed.connect(func(): _on_item_selected(item_id, item_info))
+	
+	return button
+
+# ============================================================================
+# SÉLECTION ET UTILISATION D'OBJET
+# ============================================================================
+
+func _on_item_selected(item_id: String, item_info: Dictionary) -> void:
+	"""Quand un objet est sélectionné"""
+	
+	item_popup.hide()
+	
+	var target_type = item_info.get("target_type", "self")
+	
+	match target_type:
+		"self":
+			# Utilisation immédiate sur soi
+			item_module.use_item(selected_unit, item_id, selected_unit)
+			_close_all_menus()
+			_deselect_unit()
+		
+		"ally_single":
+			# Sélectionner un allié
+			current_action_state = ActionState.SELECTING_ITEM_TARGET
+			set_meta("pending_item_id", item_id)
+			set_meta("pending_item_type", "ally_single")
+			EventBus.notify("Sélectionnez un allié", "info")
+		
+		"enemy_single", "enemy_duo":
+			# Sélectionner un ennemi
+			current_action_state = ActionState.SELECTING_ITEM_TARGET
+			set_meta("pending_item_id", item_id)
+			set_meta("pending_item_type", target_type)
+			EventBus.notify("Sélectionnez une cible ennemie", "info")
+		
+		"ally_single_position":
+			# Sélectionner une position
+			current_action_state = ActionState.SELECTING_ITEM_TARGET
+			set_meta("pending_item_id", item_id)
+			set_meta("pending_item_type", "position")
+			
+			# Highlight des cases accessibles
+			var effect = item_info.get("effect", {})
+			var range = effect.get("range", 5)
+			var positions = _get_positions_in_range(selected_unit.grid_position, range)
+			terrain_module.highlight_tiles(positions, MOVEMENT_COLOR)
+			
+			EventBus.notify("Sélectionnez une destination", "info")
+
+func _on_item_menu_cancel() -> void:
+	"""Annule la sélection d'objet"""
+	item_popup.hide()
+	_open_action_menu()
+	
+func _on_item_used(unit: BattleUnit3D, item_id: String, target: Variant) -> void:
+	"""Callback quand un objet est utilisé"""
+	GlobalLogger.info("BATTLE", "%s utilise l'objet %s" % [unit.unit_name, item_id])
+
+func _on_item_failed(unit: BattleUnit3D, item_id: String, reason: String) -> void:
+	"""Callback quand l'utilisation d'un objet échoue"""
+	EventBus.notify("❌ " + reason, "error")
+	
+func _get_positions_in_range(center: Vector2i, range: int) -> Array[Vector2i]:
+	"""Retourne toutes les positions dans un rayon donné"""
+	var positions: Array[Vector2i] = []
+	
+	for dy in range(-range, range + 1):
+		for dx in range(-range, range + 1):
+			var manhattan = abs(dx) + abs(dy)
+			if manhattan <= range:
+				var pos = center + Vector2i(dx, dy)
+				if terrain_module.is_in_bounds(pos) and terrain_module.is_walkable(pos):
+					positions.append(pos)
+	
+	return positions

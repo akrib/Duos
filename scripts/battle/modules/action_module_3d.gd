@@ -69,7 +69,20 @@ func execute_attack(attacker: BattleUnit3D, target: BattleUnit3D, duo_partner: B
 		await attacker.get_tree().create_timer(0.5).timeout
 	
 	await _animate_attack_3d(attacker, target)
-	
+
+	if is_duo_attack and duo_partner:
+		var mana_cost = 20  # TODO: Ajuster selon le ring de canalisation
+		
+		if not duo_partner.consume_mana(mana_cost):
+			EventBus.notify("❌ Mana insuffisant pour le duo", "error")
+			GlobalLogger.warning("ACTION", "%s : mana insuffisant" % duo_partner.unit_name)
+			return
+		
+		GlobalLogger.info("ACTION", "%s (support) consomme %d mana" % [
+			duo_partner.unit_name,
+			mana_cost
+		])
+
 	var damage = calculate_damage(attacker, target)
 	
 	# Bonus de duo
@@ -113,6 +126,13 @@ func calculate_damage(attacker: BattleUnit3D, target: BattleUnit3D) -> int:
 	var base_damage = attacker.attack_power
 	var terrain_defense = terrain.get_defense_bonus(target.grid_position)
 	var total_defense = target.defense_power + (terrain_defense * 0.1)
+	
+	# ✅ Appliquer la réduction de défense si l'unité défend
+	if target.has_meta("is_defending"):
+		var defense_reduction = target.get_meta("defense_bonus", 0.0)
+		base_damage = int(base_damage * (1.0 - defense_reduction))
+		GlobalLogger.debug("ACTION", "%s défend : -%d%% dégâts" % [target.unit_name, int(defense_reduction * 100)])
+	
 	var damage = max(1, int(base_damage - total_defense))
 	damage = int(damage * randf_range(0.9, 1.1))
 	
