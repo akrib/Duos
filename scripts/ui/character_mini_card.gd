@@ -14,6 +14,8 @@ class_name CharacterMiniCard
 @onready var hp_label: Label = $MarginContainer/VBoxContainer/StatsGrid/HPValue
 @onready var atk_label: Label = $MarginContainer/VBoxContainer/StatsGrid/ATKValue
 @onready var def_label: Label = $MarginContainer/VBoxContainer/StatsGrid/DEFValue
+@onready var mana_label: Label = $MarginContainer/VBoxContainer/StatsGrid/ManaValue 
+
 
 # ============================================================================
 # CONFIGURATION
@@ -42,24 +44,24 @@ func _ready() -> void:
 # ============================================================================
 
 func setup_from_unit(unit: BattleUnit3D) -> void:
-	"""Configure la carte à partir d'une unité de combat"""
-	
 	if not is_inside_tree():
 		await ready
 	
-	# Nom
 	if name_label:
 		name_label.text = unit.unit_name
 	
-	# Classe (si disponible via metadata ou autre)
 	if class_label:
 		var unit_class = unit.get_meta("unit_class", "Guerrier")
 		class_label.text = unit_class
 	
-	# Stats
 	if hp_label:
 		hp_label.text = "%d/%d" % [unit.current_hp, unit.max_hp]
 		_colorize_hp(unit.current_hp, unit.max_hp)
+	
+	# ✅ NOUVEAU : Mana
+	if mana_label:
+		mana_label.text = "%d/%d (%s)" % [unit.current_mana, unit.max_mana, unit.mana_type.capitalize()]
+		_colorize_mana(unit.current_mana, unit.max_mana, unit.mana_type)
 	
 	if atk_label:
 		atk_label.text = str(unit.attack_power)
@@ -67,7 +69,6 @@ func setup_from_unit(unit: BattleUnit3D) -> void:
 	if def_label:
 		def_label.text = str(unit.defense_power)
 	
-	# Portrait (si existe)
 	_set_portrait_from_unit(unit)
 
 func setup_from_data(data: Dictionary) -> void:
@@ -111,20 +112,35 @@ func setup_from_data(data: Dictionary) -> void:
 # ============================================================================
 
 func _set_portrait_from_unit(unit: BattleUnit3D) -> void:
-	"""Essaye de charger le portrait depuis les métadonnées de l'unité"""
-	
 	if not portrait:
 		return
 	
-	# Chercher dans les métadonnées
+	# ✅ NOUVEAU : Capturer le sprite de l'unité
+	if unit.sprite_3d and unit.sprite_3d.texture:
+		var sprite_texture = unit.sprite_3d.texture
+		portrait.texture = sprite_texture
+		
+		# Si c'est un sprite sheet, utiliser la même frame
+		if unit.sprite_3d.hframes > 1 or unit.sprite_3d.vframes > 1:
+			# Créer un AtlasTexture pour afficher la bonne frame
+			var atlas = AtlasTexture.new()
+			atlas.atlas = sprite_texture
+			
+			var frame_width = sprite_texture.get_width() / unit.sprite_3d.hframes
+			var frame_height = sprite_texture.get_height() / unit.sprite_3d.vframes
+			
+			var frame_x = (unit.sprite_frame % unit.sprite_3d.hframes) * frame_width
+			var frame_y = (unit.sprite_frame / unit.sprite_3d.hframes) * frame_height
+			
+			atlas.region = Rect2(frame_x, frame_y, frame_width, frame_height)
+			portrait.texture = atlas
+		
+		return
+	
+	# Fallback : couleur unie
 	if unit.has_meta("portrait"):
 		var portrait_path = unit.get_meta("portrait")
 		_set_portrait(portrait_path)
-	else:
-		# Fallback : Couleur de l'unité
-		var color_rect = ColorRect.new()
-		color_rect.color = unit.get_meta("color", Color.WHITE)
-		# TODO: Utiliser un sprite par défaut
 
 func _set_portrait(path: String) -> void:
 	"""Charge une texture de portrait"""
@@ -171,3 +187,19 @@ func clear() -> void:
 		def_label.text = "--"
 	if portrait:
 		portrait.texture = null
+
+
+func _colorize_mana(current: int, maximum: int, mana_type: String) -> void:
+	if not mana_label:
+		return
+	
+	# Utiliser la couleur du type de mana
+	var mana_colors = {
+		"neutral": Color(0.8, 0.8, 1.0),
+		"fire": Color(1.0, 0.3, 0.1),
+		"ice": Color(0.2, 0.7, 1.0),
+		"lightning": Color(1.0, 1.0, 0.3),
+	}
+	
+	var color = mana_colors.get(mana_type, Color(0.5, 0.8, 1.0))
+	mana_label.add_theme_color_override("font_color", color)

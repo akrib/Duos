@@ -794,20 +794,27 @@ func _handle_terrain_click(grid_pos: Vector2i) -> void:
 		return
 	
 	if current_action_state == ActionState.SHOWING_MOVE or current_action_state == ActionState.USING_REST:
+		# ✅ FIX : En mode repos, vérifier que la case est dans la liste calculée
+		if current_action_state == ActionState.USING_REST:
+			# Récupérer les positions accessibles avec repos
+			var rest_positions = movement_module.calculate_single_step_positions(selected_unit)
+			
+			if grid_pos not in rest_positions:
+				GlobalLogger.debug("BATTLE", "Clic hors portée de repos - annulation")
+				_close_all_menus()
+				_deselect_unit()
+				return
+		
 		if movement_module.can_move_to(selected_unit, grid_pos):
-			# Déplacement valide
 			await movement_module.move_unit(selected_unit, grid_pos)
 			
-			# ✅ Si on était en mode repos, consommer le point
 			if current_action_state == ActionState.USING_REST:
-				# Le point de repos a déjà été consommé avant le déplacement
 				GlobalLogger.debug("BATTLE", "Déplacement avec repos terminé")
 			
 			selected_unit.movement_used = true
 			_close_all_menus()
 			_deselect_unit()
 		else:
-			# Clic hors portée -> annuler
 			GlobalLogger.debug("BATTLE", "Clic hors portée de déplacement - annulation")
 			_close_all_menus()
 			_deselect_unit()
@@ -828,6 +835,8 @@ func _handle_terrain_click(grid_pos: Vector2i) -> void:
 			item_module.use_item(selected_unit, item_id, grid_pos)
 			_close_all_menus()
 			_deselect_unit()
+
+			
 # ============================================================================
 # PANEL D'INFORMATION
 # ============================================================================
@@ -844,7 +853,15 @@ func _display_unit_info(unit: BattleUnit3D) -> void:
 	info_unit_name_label.text = unit.unit_name
 	info_class_label.text = "Classe: " + unit.get_meta("class", "Guerrier")
 	
+	# HP
 	info_hp_value.text = "%d/%d" % [unit.current_hp, unit.max_hp]
+	
+	# ✅ NOUVEAU : Afficher le mana
+	var mana_text = "%d/%d (%s)" % [unit.current_mana, unit.max_mana, unit.mana_type.capitalize()]
+	# On peut utiliser un label existant ou en créer un nouveau
+	# Pour l'instant, ajoutons-le au label de classe
+	info_class_label.text = "Classe: %s | Mana: %s" % [unit.get_meta("class", "Guerrier"), mana_text]
+	
 	info_atk_value.text = str(unit.attack_power)
 	info_def_value.text = str(unit.defense_power)
 	info_mov_value.text = str(unit.movement_range)
@@ -856,7 +873,8 @@ func _display_unit_info(unit: BattleUnit3D) -> void:
 		info_hp_value.add_theme_color_override("font_color", Color.YELLOW)
 	else:
 		info_hp_value.add_theme_color_override("font_color", Color.RED)
-
+		
+		
 func _display_terrain_info() -> void:
 	if not terrain_module:
 		info_unit_name_label.text = "[Chargement...]"
@@ -1044,6 +1062,7 @@ func _on_defend_pressed() -> void:
 	selected_unit.set_meta("is_defending", true)
 	selected_unit.set_meta("defense_bonus", 0.30)  # 30% de réduction
 	
+	selected_unit.update_state_indicators() 
 	# ✅ Effet visuel de défense
 	_play_defend_animation(selected_unit)
 	
@@ -1129,6 +1148,7 @@ func _on_prepare_pressed() -> void:
 	selected_unit.action_used = true
 	selected_unit.movement_used = true
 	
+	selected_unit.update_state_indicators()
 	# Animation
 	_play_prepare_animation(selected_unit)
 	

@@ -33,6 +33,7 @@ grow_horizontal = 2
 grow_vertical = 2
 
 [node name="ItemPopup" type="PopupPanel" parent="UILayer/BattleUI"]
+custom_minimum_size = Vector2(450, 500)
 
 [node name="MarginContainer" type="MarginContainer" parent="UILayer/BattleUI/ItemPopup"]
 offset_left = 4.0

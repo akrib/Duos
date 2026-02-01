@@ -151,6 +151,8 @@ var torus_material: StandardMaterial3D
 var hp_bar_material: StandardMaterial3D
 var mana_bar_material: StandardMaterial3D
 
+var defend_indicator: Sprite3D = null  # Diamant bleu (défense)
+var prepared_indicator: Sprite3D = null  # Diamant rouge (préparé)
 # ============================================================================
 # INITIALISATION
 # ============================================================================
@@ -198,7 +200,7 @@ func _create_visuals_3d() -> void:
 	show()
 	
 	_start_breathing_animation()
-	
+	_create_state_indicators()
 	GlobalLogger.debug("BATTLE_UNIT", "Visuels créés pour %s" % unit_name)
 
 func _load_sprite_texture() -> void:
@@ -684,6 +686,9 @@ func reset_for_new_turn() -> void:
 	
 	_process_status_effects()
 	update_torus_state(true)
+	update_state_indicators() 
+
+
 
 func _process_status_effects() -> void:
 	var effects_to_remove: Array[String] = []
@@ -1035,3 +1040,62 @@ func hide_duo_aura() -> void:
 		_fade_and_destroy_duo_aura(aura)
 
 	remove_meta("duo_aura")
+
+func _create_state_indicators() -> void:
+	"""Crée les diamants d'état au-dessus de l'unité"""
+	
+	# Diamant bleu (défense)
+	defend_indicator = Sprite3D.new()
+	defend_indicator.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	defend_indicator.texture = _create_diamond_texture(Color(0.3, 0.6, 1.0))  # Bleu
+	defend_indicator.pixel_size = 0.02
+	defend_indicator.position = Vector3(0, sprite_height + 1.2, 0)
+	defend_indicator.visible = false
+	add_child(defend_indicator)
+	
+	# Diamant rouge (préparé)
+	prepared_indicator = Sprite3D.new()
+	prepared_indicator.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	prepared_indicator.texture = _create_diamond_texture(Color(1.0, 0.3, 0.3))  # Rouge
+	prepared_indicator.pixel_size = 0.02
+	prepared_indicator.position = Vector3(0, sprite_height + 1.2, 0)
+	prepared_indicator.visible = false
+	add_child(prepared_indicator)
+	
+func _create_diamond_texture(color: Color) -> ImageTexture:
+	"""Crée une texture de diamant"""
+	var size = 64
+	var image = Image.create(size, size, false, Image.FORMAT_RGBA8)
+	image.fill(Color.TRANSPARENT)
+	
+	var center = size / 2
+	
+	# Dessiner un losange
+	for y in range(size):
+		for x in range(size):
+			var dx = abs(x - center)
+			var dy = abs(y - center)
+			
+			# Distance Manhattan pour former un losange
+			if dx + dy < center:
+				var edge_dist = center - (dx + dy)
+				var alpha = 1.0
+				
+				# Bordure plus sombre
+				if edge_dist < 3:
+					image.set_pixel(x, y, color.darkened(0.5))
+				else:
+					image.set_pixel(x, y, color)
+	
+	return ImageTexture.create_from_image(image)
+
+func update_state_indicators() -> void:
+	"""Met à jour la visibilité des indicateurs d'état"""
+	
+	if defend_indicator:
+		defend_indicator.visible = has_meta("is_defending")
+	
+	if prepared_indicator:
+		prepared_indicator.visible = has_meta("is_prepared")
+
+# Modifier reset_for_new_turn pour mettre à jour les indicateurs :

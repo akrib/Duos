@@ -1,6 +1,6 @@
-[gd_scene load_steps=3 format=3 uid="uid://character_mini_card"]
+[gd_scene load_steps=3 format=3 uid="uid://s2v7pw0kg1jp"]
 
-[ext_resource type="Script" path="res://scripts/ui/character_mini_card.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://24d7w5vkhrdp" path="res://scripts/ui/character_mini_card.gd" id="1_script"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_card"]
 bg_color = Color(0.15, 0.15, 0.18, 0.95)
@@ -68,6 +68,17 @@ text = "HP:"
 [node name="HPValue" type="Label" parent="MarginContainer/VBoxContainer/StatsGrid"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.5, 1, 0.5, 1)
+theme_override_font_sizes/font_size = 14
+text = "--/--"
+
+[node name="ManaLabel" type="Label" parent="MarginContainer/VBoxContainer/StatsGrid"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "Mana:"
+
+[node name="ManaValue" type="Label" parent="MarginContainer/VBoxContainer/StatsGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.5, 0.8, 1, 1)
 theme_override_font_sizes/font_size = 14
 text = "--/--"
 
