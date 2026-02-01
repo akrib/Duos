@@ -38,8 +38,8 @@ class ValidationReport:
 # ============================================================================
 
 const DATA_PATHS = {
-	"rings": "res://data/rings.json",
-	"mana_effects": "res://data/mana_effects.json",
+	"rings": "res://data/ring/rings.json",
+	"mana_effects": "res://data/mana/mana_effects.json",
 	"units": "res://data/team/available_units.json"
 }
 

@@ -91,9 +91,11 @@ const CHARACTER_MINI_CARD_SCENE = preload("res://scenes/ui/character_mini_card.t
 @onready var move_button: Button = $UILayer/BattleUI/ActionPopup/VBoxContainer/MoveButton
 @onready var attack_button: Button = $UILayer/BattleUI/ActionPopup/VBoxContainer/AttackButton
 @onready var defend_button: Button = $UILayer/BattleUI/ActionPopup/VBoxContainer/DefendButton
-@onready var abilities_button: Button = $UILayer/BattleUI/ActionPopup/VBoxContainer/AbilitiesButton
+@onready var draw_mana_button: Button = $UILayer/BattleUI/ActionPopup/VBoxContainer/DrawManaButton
+#@onready var abilities_button: Button = $UILayer/BattleUI/ActionPopup/VBoxContainer/AbilitiesButton
 @onready var items_button: Button = $UILayer/BattleUI/ActionPopup/VBoxContainer/ItemsButton
-@onready var wait_action_button: Button = $UILayer/BattleUI/ActionPopup/VBoxContainer/WaitActionButton
+@onready var prepare_button: Button = $UILayer/BattleUI/ActionPopup/VBoxContainer/PrepareButton
+#@onready var wait_action_button: Button = $UILayer/BattleUI/ActionPopup/VBoxContainer/WaitActionButton
 @onready var cancel_button: Button = $UILayer/BattleUI/ActionPopup/VBoxContainer/CancelButton
 
 # Menu de duo
@@ -129,9 +131,10 @@ const CHARACTER_MINI_CARD_SCENE = preload("res://scenes/ui/character_mini_card.t
 @onready var compass_center: Button = $UILayer/BattleUI/BottomBar/MarginContainer/HBoxContainer/CameraCompass/CenterButton
 
 # Dialogue
+# Dialogue et objets
 @onready var dialogue_box: DialogueBox = $UILayer/DialogueBox
-@onready var item_popup: PopupPanel  # À créer dans la scène
-@onready var item_list_container: VBoxContainer  # À créer dans la scène
+@onready var item_popup: PopupPanel = $UILayer/BattleUI/ItemPopup
+@onready var item_list_container: VBoxContainer = $UILayer/BattleUI/ItemPopup/MarginContainer/VBoxContainer/ScrollContainer/ItemListContainer
 # ============================================================================
 # MODULES
 # ============================================================================
@@ -379,9 +382,9 @@ func _connect_ui_buttons() -> void:
 	move_button.pressed.connect(_on_move_pressed)
 	attack_button.pressed.connect(_on_attack_pressed)
 	defend_button.pressed.connect(_on_defend_pressed)
-	abilities_button.pressed.connect(_on_abilities_pressed)
+	draw_mana_button.pressed.connect(_on_draw_mana_pressed)
 	items_button.pressed.connect(_on_items_pressed)
-	wait_action_button.pressed.connect(_on_wait_action_pressed)
+	prepare_button.pressed.connect(_on_prepare_pressed)
 	cancel_button.pressed.connect(_on_cancel_action_pressed)
 	
 	# Menu de duo
@@ -963,7 +966,7 @@ func _open_action_menu() -> void:
 	
 	attack_button.disabled = not selected_unit.can_act()
 	defend_button.disabled = not selected_unit.can_act()
-	abilities_button.disabled = not selected_unit.can_act() or selected_unit.abilities.is_empty()
+	draw_mana_button.disabled = not selected_unit.can_act()
 	
 	action_popup.popup()
 
@@ -1060,21 +1063,91 @@ func _play_defend_animation(unit: BattleUnit3D) -> void:
 	tween.tween_property(unit.sprite_3d, "modulate", Color(0.5, 0.5, 1.5), 0.2)
 	tween.tween_property(unit.sprite_3d, "modulate", Color.WHITE, 0.2)
 
-func _on_abilities_pressed() -> void:
+func _on_draw_mana_pressed() -> void:
+	"""Action : Puiser du mana (récupération partielle)"""
+	
 	if not selected_unit or not selected_unit.can_act():
 		return
 	
-	GlobalLogger.debug("BATTLE", "Capacités (à implémenter)")
-	_close_all_menus()
-
-func _on_wait_action_pressed() -> void:
-	if not selected_unit:
-		return
+	# Récupérer 30% du mana maximum
+	var mana_gained = int(selected_unit.max_mana * 0.30)
+	selected_unit.restore_mana(mana_gained)
 	
-	selected_unit.movement_used = true
+	# Marquer l'action comme utilisée
 	selected_unit.action_used = true
+	selected_unit.movement_used = true
+	
+	# Animation visuelle
+	_play_mana_draw_animation(selected_unit)
+	
+	EventBus.notify("✨ %s puise du mana : +%d" % [selected_unit.unit_name, mana_gained], "success")
+	GlobalLogger.info("BATTLE", "%s puise %d mana (total: %d/%d)" % [
+		selected_unit.unit_name,
+		mana_gained,
+		selected_unit.current_mana,
+		selected_unit.max_mana
+	])
+	
 	_close_all_menus()
 	_deselect_unit()
+
+func _play_mana_draw_animation(unit: BattleUnit3D) -> void:
+	"""Animation de puisage de mana"""
+	
+	if not unit or not unit.sprite_3d:
+		return
+	
+	# Effet de brille cyan
+	var tween = unit.create_tween()
+	tween.set_parallel(true)
+	
+	# Pulsation
+	tween.tween_property(unit.sprite_3d, "scale", Vector3(1.2, 1.2, 1.2), 0.3).set_ease(Tween.EASE_OUT)
+	tween.tween_property(unit.sprite_3d, "scale", Vector3.ONE, 0.3).set_delay(0.3)
+	
+	# Couleur cyan brillante
+	tween.tween_property(unit.sprite_3d, "modulate", Color(0.3, 1.5, 1.5), 0.3)
+	tween.tween_property(unit.sprite_3d, "modulate", Color.WHITE, 0.3).set_delay(0.3)
+	
+	await tween.finished
+
+func _on_prepare_pressed() -> void:
+	"""Action : Se préparer (bonus au prochain tour)"""
+	
+	if not selected_unit or not selected_unit.can_act():
+		return
+	
+	# Marquer comme préparé
+	selected_unit.set_meta("is_prepared", true)
+	selected_unit.set_meta("prepared_bonus", {
+		"attack": 1.2,  # +20% attaque
+		"defense": 1.15,  # +15% défense
+		"turns_remaining": 1
+	})
+	
+	# Marquer l'action
+	selected_unit.action_used = true
+	selected_unit.movement_used = true
+	
+	# Animation
+	_play_prepare_animation(selected_unit)
+	
+	EventBus.notify("🛡️ %s se prépare (+20%% ATK, +15%% DEF)" % selected_unit.unit_name, "info")
+	GlobalLogger.info("BATTLE", "%s se prépare pour le prochain tour" % selected_unit.unit_name)
+	
+	_close_all_menus()
+	_deselect_unit()
+
+func _play_prepare_animation(unit: BattleUnit3D) -> void:
+	"""Animation de préparation"""
+	
+	if not unit or not unit.sprite_3d:
+		return
+	
+	# Effet de concentration (couleur dorée)
+	var tween = unit.create_tween()
+	tween.tween_property(unit.sprite_3d, "modulate", Color(1.5, 1.5, 0.5), 0.4).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(unit.sprite_3d, "modulate", Color.WHITE, 0.4).set_ease(Tween.EASE_IN_OUT)
 
 func _on_cancel_action_pressed() -> void:
 	_close_all_menus()

@@ -330,20 +330,20 @@ custom_minimum_size = Vector2(180, 40)
 layout_mode = 2
 text = "🛡 Défendre"
 
-[node name="AbilitiesButton" type="Button" parent="UILayer/BattleUI/ActionPopup/VBoxContainer"]
+[node name="DrawManaButton" type="Button" parent="UILayer/BattleUI/ActionPopup/VBoxContainer"]
 custom_minimum_size = Vector2(180, 40)
 layout_mode = 2
-text = "✨ Capacités"
+text = "💧 Puiser du Mana"
 
 [node name="ItemsButton" type="Button" parent="UILayer/BattleUI/ActionPopup/VBoxContainer"]
 custom_minimum_size = Vector2(180, 40)
 layout_mode = 2
 text = "🎒 Objets"
 
-[node name="WaitActionButton" type="Button" parent="UILayer/BattleUI/ActionPopup/VBoxContainer"]
+[node name="PrepareButton" type="Button" parent="UILayer/BattleUI/ActionPopup/VBoxContainer"]
 custom_minimum_size = Vector2(180, 40)
 layout_mode = 2
-text = "⏸ Passer le tour"
+text = "🛡️ Se Préparer"
 
 [node name="CancelButton" type="Button" parent="UILayer/BattleUI/ActionPopup/VBoxContainer"]
 custom_minimum_size = Vector2(180, 40)

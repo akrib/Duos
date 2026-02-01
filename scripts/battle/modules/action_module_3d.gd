@@ -99,8 +99,13 @@ func execute_attack(attacker: BattleUnit3D, target: BattleUnit3D, duo_partner: B
 	# ✅ NOUVEAU : Retirer les auras après l'attaque
 	if is_duo_attack:
 		await attacker.get_tree().create_timer(0.5).timeout
-		attacker.hide_duo_aura()
-		duo_partner.hide_duo_aura()
+		
+		# Vérifier que les unités existent encore
+		if is_instance_valid(attacker) and attacker.is_alive():
+			attacker.hide_duo_aura()
+		
+		if is_instance_valid(duo_partner) and duo_partner.is_alive():
+			duo_partner.hide_duo_aura()
 
 # ✅ NOUVELLE FONCTION
 func _spawn_damage_number(target: BattleUnit3D, damage: int) -> void:
@@ -124,9 +129,29 @@ func _spawn_damage_number(target: BattleUnit3D, damage: int) -> void:
 
 func calculate_damage(attacker: BattleUnit3D, target: BattleUnit3D) -> int:
 	var base_damage = attacker.attack_power
+	if attacker.has_meta("is_prepared"):
+		var bonus = attacker.get_meta("prepared_bonus", {})
+		if bonus.has("attack"):
+			base_damage = int(base_damage * bonus.attack)
+			GlobalLogger.debug("ACTION", "%s (préparé) : attaque boostée x%.2f" % [attacker.unit_name, bonus.attack])
+		
+		# Décrémenter le compteur
+		bonus.turns_remaining -= 1
+		if bonus.turns_remaining <= 0:
+			attacker.remove_meta("is_prepared")
+			attacker.remove_meta("prepared_bonus")
+			GlobalLogger.debug("ACTION", "%s : bonus de préparation expiré" % attacker.unit_name)
+		else:
+			attacker.set_meta("prepared_bonus", bonus)
+	
 	var terrain_defense = terrain.get_defense_bonus(target.grid_position)
 	var total_defense = target.defense_power + (terrain_defense * 0.1)
-	
+	# ✅ Appliquer le bonus défensif de préparation
+	if target.has_meta("is_prepared"):
+		var bonus = target.get_meta("prepared_bonus", {})
+		if bonus.has("defense"):
+			total_defense = int(total_defense * bonus.defense)
+			GlobalLogger.debug("ACTION", "%s (préparé) : défense boostée x%.2f" % [target.unit_name, bonus.defense])
 	# ✅ Appliquer la réduction de défense si l'unité défend
 	if target.has_meta("is_defending"):
 		var defense_reduction = target.get_meta("defense_bonus", 0.0)
